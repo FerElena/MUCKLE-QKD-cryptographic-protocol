@@ -50,10 +50,10 @@ const uint8_t RESPONDER = 1;
 const uint8_t SK_NOT_REVEALED = 0;
 const uint8_t SK_REVEALED = 1;
 
-// lengths
+// SIZES
 const uint8_t ID_SZ 32;
 const uint8_t LABEL_SZ = 32;
-const uint8_t HEADER_SZ = 1 + 2 + 2 + 2 + 2 + 32;
+const uint8_t HEADER_SZ = 1 + 2 + 2 + 2 + 2 + 2 + 32;
 const uint8_t PSK_SZ = 32;
 const uint8_t SECST_SZ = 32;
 const uint8_t CTR_SZ = 32;
@@ -195,6 +195,17 @@ const string elliptic_curve_names[elliptic_curve_types_size] = {
     "x25519",
     "x448"};
 
+/**
+ * @brief enum representing the ML_KEM security in relation with NIST security levels
+ */
+typedef enum ml_kem : unsigned short
+{
+    ml_kem_128,
+    ml_kem_192,
+    ml_kem_256,
+    ml_kem_enum_size // size of the enum
+} ml_kem;
+
 /****************************************************************************************************************
  * auxiliar inline functions
  ****************************************************************************************************************/
@@ -260,7 +271,7 @@ private:
     unsigned char l_B[LABEL_SZ];    ///< Responder label used in the PRF (represented as B in the original paper)
     unsigned char l_CKEM[LABEL_SZ]; ///< Label used in the PRF to derive the classical key (refered as ck in the paper)
     unsigned char l_QKEM[LABEL_SZ]; ///< Label used in the PRF to derive the quantum key (refered as qk in the paper)
-    uint8_t header[HEADER_SZ];      ///< Current header for the protocol, have space for: direction(1B)||mac_prim(2B)||prf_prim(2B)||kdf_prim(2B)||elliptic_curve(2B)||self_id(32B) ,where B means bytes
+    uint8_t header[HEADER_SZ];      ///< Current header for the protocol, have space for: direction(1B)||mac_prim(2B)||prf_prim(2B)||kdf_prim(2B)||elliptic_curve(2B)||ml_kem_seclvl(2B)||self_id(32B) ,where B means bytes
     uint8_t sec_st[SECST_SZ];       ///< Current secret state of the Muckle protocol (refered as SecState in the paper) 256 bit len
     uint8_t psk[PSK_SZ];            ///< Pre-shared Symmetric Keys that must be instanciated in the initialization (refered as PSK in the paper) 256 bits len
     uint8_t ctr[CTR_SZ];            ///< Counter that is incremented on each iteration of the protocol
@@ -271,6 +282,8 @@ private:
     prf_primitive prf_prim;         ///< Pseudo Random Function (PRF) that is going to be used in this instance of the protocol
     prf_primitive kdf_prim;         ///< Key derivation function used to derive the key in the classic and post-quantum KEM
     elliptic_curve ecdh_c;          ///< Elliptic curve that will be utilized in the ECDH key exchange
+    ml_kem qkem_mode;               ///< Post-quantum KEM security level choosen
+
 
     /* the private and public keys of asymmetric cryptography cannot be crypto-agile, since in the botan library and most libraries are defined with a specific structure for
     the algorithm,because they are not simply a stream of bits in an array, but an object representing mathematical properties specific to the algorithm, so currently
@@ -364,8 +377,10 @@ public:
      *
      * @throws invalid_argument if any input parameter is invalid.
      */
-    key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM,
-                        uint8_t *sec_st, uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c);
+    key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM,uint8_t *sec_st,
+                        uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c, ml_kem qkem_mode);
+
+    ~key_exchange_MUCKLE;
 };
 
 #endif

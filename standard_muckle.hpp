@@ -234,9 +234,11 @@ inline void secure_zeroize_vector(std::vector<uint8_t> &vec)
  *
  * @param ctr The 32-byte counter to be incremented.
  */
-inline void inc_ctr(uint8_t ctr[32]) {
-    for (int i = 31; i >= 0; --i) {
-        if (++ctr[i] != 0) 
+inline void inc_ctr(uint8_t ctr[32])
+{
+    for (int i = 31; i >= 0; --i)
+    {
+        if (++ctr[i] != 0)
             return;
     }
 }
@@ -338,8 +340,32 @@ private:
     void prf(const uint8_t *k, const uint8_t *in_buff, size_t in_buff_len, uint8_t out_buff);
 
 public:
+    ////////////////////////// public_methods ////////////////////////
+
+    /**
+     * @brief Constructor for the key_exchange_MUCKLE class.
+     *
+     * Initializes a MUCKLE key exchange object with the provided parameters, performing necessary parameter checks and assignments.
+     *
+     * @param rol Role identifier (0 or 1).
+     * @param s_id Pointer to the session identifier.
+     * @param p_id Pointer to the party identifier.
+     * @param l_A Pointer to label A.
+     * @param l_B Pointer to label B.
+     * @param l_CKEM Pointer to label CKEM.
+     * @param l_QKEM Pointer to label QKEM.
+     * @param sec_st Pointer to the security state.
+     * @param psk Pointer to the pre-shared key.
+     * @param mac_prim MAC primitive.
+     * @param mac_trunc MAC truncation length.
+     * @param prf_prim PRF primitive.
+     * @param kdf_prim KDF primitive.
+     * @param ecdh_c ECDH curve.
+     *
+     * @throws invalid_argument if any input parameter is invalid.
+     */
     key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM,
-                        uint8_t *sec_st, uint8_t *psk, mac_primitive mac_prim,uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c);
+                        uint8_t *sec_st, uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c);
 };
 
 #endif

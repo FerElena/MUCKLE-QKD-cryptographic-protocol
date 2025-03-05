@@ -78,7 +78,7 @@ void key_exchange_MUCKLE::prf(const uint8_t *k, const uint8_t *in_buff, size_t i
  * Public methods implementation
  ****************************************************************************************************************/
 
- key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM,
+key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM,
     uint8_t *sec_st, uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c)
 {
     // parameter checking, if invalid rol or invalid primitives, throw exception

@@ -51,9 +51,9 @@ const uint8_t SK_NOT_REVEALED = 0;
 const uint8_t SK_REVEALED = 1;
 
 // lengths
-
+const uint8_t ID_SZ 32;
 const uint8_t LABEL_SZ = 32;
-const uint8_t HEADER_SZ = 1 + 2 + 2 + 2 + 32;
+const uint8_t HEADER_SZ = 1 + 2 + 2 + 2 + 2 + 32;
 const uint8_t PSK_SZ = 32;
 const uint8_t SECST_SZ = 32;
 const uint8_t CTR_SZ = 32;
@@ -195,6 +195,10 @@ const string elliptic_curve_names[elliptic_curve_types_size] = {
     "x25519",
     "x448"};
 
+/****************************************************************************************************************
+ * auxiliar inline functions
+ ****************************************************************************************************************/
+
 /**
  * @brief pattern used for secure data zeroization
  *
@@ -222,6 +226,21 @@ inline void secure_zeroize_vector(std::vector<uint8_t> &vec)
     secure_zeroize(vec.data(), vec.size());
 }
 
+/**
+ * @brief Increments a 32-byte counter with carry propagation.
+ *
+ * This function increments the 32-byte counter, ensuring that the carry is propagated correctly between bytes.
+ * If the counter reaches its maximum value and is incremented, all bytes are set to 0.
+ *
+ * @param ctr The 32-byte counter to be incremented.
+ */
+inline void inc_ctr(uint8_t ctr[32]) {
+    for (int i = 31; i >= 0; --i) {
+        if (++ctr[i] != 0) 
+            return;
+    }
+}
+
 /****************************************************************************************************************
  * class definition
  ****************************************************************************************************************/
@@ -232,18 +251,19 @@ private:
     /////////////////////////// attributes ///////////////////////////
 
     uint8_t rol;                    ///< Rol of the communicator, it can be a INITIALIZER, or a RESPONDER
-    uint64_t s_id;                  ///< Communicator self ID
-    uint64_t p_id;                  ///< Partner ID
+    uint8_t s_id[ID_SZ];            ///< Communicator self ID
+    uint8_t p_id[ID_SZ];            ///< Partner ID
     com_state com_st;               ///< Current comunication state represented by the enum com_state
     unsigned char l_A[LABEL_SZ];    ///< Initializer label used in the PRF (represented as A in the original paper)
     unsigned char l_B[LABEL_SZ];    ///< Responder label used in the PRF (represented as B in the original paper)
     unsigned char l_CKEM[LABEL_SZ]; ///< Label used in the PRF to derive the classical key (refered as ck in the paper)
     unsigned char l_QKEM[LABEL_SZ]; ///< Label used in the PRF to derive the quantum key (refered as qk in the paper)
-    uint8_t header[HEADER_SZ];      ///< Current header for the protocol, have space for: direction(1B)||mac_prim(2B)||prf_prim(2B)||kdf_prim(2B)||self_id(32B) ,where B means bytes
+    uint8_t header[HEADER_SZ];      ///< Current header for the protocol, have space for: direction(1B)||mac_prim(2B)||prf_prim(2B)||kdf_prim(2B)||elliptic_curve(2B)||self_id(32B) ,where B means bytes
     uint8_t sec_st[SECST_SZ];       ///< Current secret state of the Muckle protocol (refered as SecState in the paper) 256 bit len
     uint8_t psk[PSK_SZ];            ///< Pre-shared Symmetric Keys that must be instanciated in the initialization (refered as PSK in the paper) 256 bits len
     uint8_t ctr[CTR_SZ];            ///< Counter that is incremented on each iteration of the protocol
     uint8_t sk[SK_SZ];              ///< Session key that is calculated after the entire protocol succed
+    uint8_t sk_st;                  ///< Currennt State of thee session key
     mac_primitive mac_prim;         ///< MAC primitive that is going to be used in this instance of the protocol
     uint16_t mac_trunc;             ///< MAC tag truncation
     prf_primitive prf_prim;         ///< Pseudo Random Function (PRF) that is going to be used in this instance of the protocol
@@ -318,9 +338,8 @@ private:
     void prf(const uint8_t *k, const uint8_t *in_buff, size_t in_buff_len, uint8_t out_buff);
 
 public:
-
-    key_exchange_MUCKLE(uint8_t rol,uint64_t s_id,uint64_t p_id,);
-
+    key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM,
+                        uint8_t *sec_st, uint8_t *psk, mac_primitive mac_prim,uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c);
 };
 
 #endif

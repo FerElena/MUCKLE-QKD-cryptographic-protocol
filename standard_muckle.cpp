@@ -77,3 +77,51 @@ void key_exchange_MUCKLE::prf(const uint8_t *k, const uint8_t *in_buff, size_t i
 /****************************************************************************************************************
  * Public methods implementation
  ****************************************************************************************************************/
+
+ key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM,
+    uint8_t *sec_st, uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c)
+{
+    // parameter checking, if invalid rol or invalid primitives, throw exception
+    if(rol > 1 || l_A == nullptr || l_B == nullptr || l_CKEM == nullptr || l_QKEM = nullptr || sec_st == nullptr || psk == nullptr ||
+         mac_prim >= mac_primitive_size || mac_trunc > 256|| prf_prim >= prf_primitive_size || kdf_prim >=prf_primitive_size || ecdh_c >= elliptic_curve_types_size )
+         throw invalid_argument("Incorrect input parameters on MUCKLE construction");
+
+    // assign input data to the object, and set attributes as initialized
+    this->rol = rol;
+    memcpy(this->s_id,s_id,ID_SZ);
+    memcpy(this->p_id,p_id,ID_SZ);
+    //copy the labels of this instantiation protocol
+    memcpy(this->l_A,l_A,LABEL_SZ);
+    memcpy(this->l_B,l_B,LABEL_SZ);
+    memcpy(this->l_CKEM,l_CKEM,LABEL_SZ);
+    memcpy(this->l_QKEM,l_QKEM,LABEL_SZ);
+
+    //copy Critical Security Parameters
+    memcpy(this->sec_st,sec_st,SECST_SZ);
+    memcpy(this->psk,psk,PSK_SZ);
+
+    //instanciate the selected cryptographic primitives
+    this->mac_prim = mac_prim;
+    this->mac_trunc = mac_trunc;
+    this->prf_prim = prf_prim;
+    this->kdf_prim = kdf_prim;
+    this->ecdh_c = ecdh_c;
+
+    //build first instance atributes
+    this->com_st = void_com;
+    this->sk_st = SK_NOT_REVEALED;
+    uint16_t itr = 0;
+    this->header[itr++] = this->rol;
+    memcpy(this->header + itr,this->mac_prim,sizeof(this->mac_prim));
+    itr+=sizeof(this->mac_prim);
+    memcpy(this->header + itr,this->prf_prim,sizeof(this->prf_prim));
+    itr+=sizeof(this->prf_prim);
+    memcpy(this->header + itr,this->kdf_prim,sizeof(this->prf_prim));
+    itr+=sizeof(this->prf_prim);
+    memcpy(this->header + itr,this->ecdh_c,sizeof(this->ecdh_c));
+    itr+=sizeof(this->ecdh_c);
+    memcpy(this->header + itr,this->s_id,ID_SZ);
+    itr+=ID_SZ;
+    if(itr != HEADER_SZ)
+    throw invalid_argument("Incorrect input parameters on MUCKLE construction");
+}

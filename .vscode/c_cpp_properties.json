@@ -4,13 +4,25 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/usr/local/include/botan-3/*"
+                "/usr/local/include/botan-3",
+                "/usr/local/include/botan-3/botan",
+                "/usr/local/lib",
+                "/usr/include",
+                "/usr/include/c++/*"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
-            "cStandard": "c17",
-            "cppStandard": "gnu++17",
-            "intelliSenseMode": "linux-gcc-x64"
+            "cStandard": "c23",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "linux-gcc-x64",
+            "browse": {
+                "path": [
+                    "/usr/local/include/botan-3",
+                    "/usr/include",
+                    "/usr/include/c++/*"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
         }
     ],
     "version": 4

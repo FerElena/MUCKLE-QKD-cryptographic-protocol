@@ -1,4 +1,4 @@
-// g++ -std=c++20 -I /usr/local/include/botan-3 pruebas.cpp -L /usr/local/lib -Wl,--start-group -lbotan-3 -Wl,--end-group -o prueba
+// g++ -std=c++20 -I /usr/local/include/botan-3 pruebas.cpp standard_muckle.cpp -L /usr/local/lib -Wl,--start-group -lbotan-3 -Wl,--end-group -o prueba
 
 #include <iostream>
 #include <iomanip>
@@ -10,6 +10,11 @@
 #include <botan/x509_key.h>
 #include <botan/data_src.h>
 #include <botan/kdf.h>
+#include <botan/ml_kem.h>
+#include <botan/pubkey.h>
+#include <botan/system_rng.h>
+
+#include "standard_muckle.hpp"
 
 using namespace std;
 
@@ -32,6 +37,7 @@ void printHex(const unsigned char *buffer, size_t size)
 
 int main()
 {
+   //ECDH
    Botan::AutoSeeded_RNG rng;
 
    // ec domain and KDF
@@ -46,7 +52,6 @@ int main()
    const auto key_apub = key_a.public_value();
    const auto key_bpub = key_b.public_value();
 
-
    // Construct key agreements and agree on a shared secret
    Botan::PK_Key_Agreement ka_a(key_a, rng, kdf);
    const auto sA = ka_a.derive_key(32, key_bpub).bits_of();
@@ -59,7 +64,33 @@ int main()
       return 1;
    }
 
-   std::cout << "agreed key:\n"
-             << Botan::hex_encode(sA);
+   std::cout << "agreed key DHEC:\n"
+             << Botan::hex_encode(sA) << endl;
+
+   //Kyber
+   const size_t shared_key_len = 32;
+
+   const auto salt = rng.random_array<16>();
+
+   Botan::ML_KEM_PrivateKey priv_key(rng, Botan::ML_KEM_Mode::ML_KEM_768);
+   auto pub_key = priv_key.public_key();
+
+   Botan::PK_KEM_Encryptor enc(*pub_key, kdf);
+
+   const auto kem_result = enc.encrypt(rng, shared_key_len, salt);
+
+   Botan::PK_KEM_Decryptor dec(priv_key, rng, kdf);
+
+   auto dec_shared_key = dec.decrypt(kem_result.encapsulated_shared_key(), shared_key_len, salt);
+
+   if (dec_shared_key != kem_result.shared_key())
+   {
+      std::cerr << "Shared keys differ\n";
+      return 1;
+   }
+
+   std::cout << "agreed key KYBER:\n"
+             << Botan::hex_encode(dec_shared_key) << endl;
+
    return 0;
 }

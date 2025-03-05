@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <string>
 #include <cstring>
+#include <iostream>
 #include <botan/kdf.h>
 #include <botan/mac.h>
 #include <botan/ml_kem.h>
@@ -34,7 +35,9 @@
 #include <botan/ecdh.h>
 #include <botan/hex.h>
 #include <botan/auto_rng.h>
-#include <botan/pkcs8.h>
+#include <botan/x509_key.h>
+#include <botan/secmem.h>
+#include <botan/kyber.h>
 
 using namespace std;
 
@@ -51,13 +54,27 @@ const uint8_t SK_NOT_REVEALED = 0;
 const uint8_t SK_REVEALED = 1;
 
 // SIZES
-const uint8_t ID_SZ 32;
-const uint8_t LABEL_SZ = 32;
-const uint8_t HEADER_SZ = 1 + 2 + 2 + 2 + 2 + 2 + 32;
-const uint8_t PSK_SZ = 32;
-const uint8_t SECST_SZ = 32;
-const uint8_t CTR_SZ = 32;
-const uint8_t SK_SZ = 32;
+const uint8_t ID_SZ = 32; //ID size
+const uint8_t LABEL_SZ = 32; //labels size
+const uint8_t HEADER_SZ = 1 + 2 + 2 + 2 + 2 + 2 + 32; // equal to 1 byte of rol + mac type + prf type + kdf type + elliptic curve type + kem seccurity + self id
+const uint8_t PSK_SZ = 32; //pre shared keys size
+const uint8_t SECST_SZ = 32; //secret state size
+const uint8_t CTR_SZ = 32; // counter size
+const uint8_t SK_SZ = 32; //symetric key size
+
+/**
+ * @brief enum representing the possible return codes
+ *
+ */
+enum class return_code {
+    MUCKLE_OK,
+    INCORRECT_ROL_OPERATION,
+    RNG_GEN_FAIL,
+    MEMORY_ALLOCATION_FAIL,
+    MAC_SIGN_FAIL,
+    INCORRECT_INPUT,
+    UNKNOWN_ERROR
+};
 
 /**
  * @brief enum representing the current satate of the communication between the instance of two parties
@@ -173,11 +190,11 @@ typedef enum elliptic_curve : unsigned short
     secpk256r1_curve,
     secp384r1_curve,
     secp521r1_curve,
-    brainpool256r1,
-    brainpool384r1,
-    brainpool512r1,
-    x25519,
-    x448,
+    brainpool256r1_curve,
+    brainpool384r1_curve,
+    brainpool512r1_curve,
+    x25519_curve,
+    x448_curve,
     elliptic_curve_types_size // size of the enum
 } elliptic_curve;
 
@@ -193,7 +210,8 @@ const string elliptic_curve_names[elliptic_curve_types_size] = {
     "brainpool384r1",
     "brainpool512r1",
     "x25519",
-    "x448"};
+    "x448"
+};
 
 /**
  * @brief enum representing the ML_KEM security in relation with NIST security levels
@@ -267,16 +285,17 @@ private:
     uint8_t s_id[ID_SZ];            ///< Communicator self ID
     uint8_t p_id[ID_SZ];            ///< Partner ID
     com_state com_st;               ///< Current comunication state represented by the enum com_state
+    uint8_t header[HEADER_SZ];      ///< Current header for the protocol, have space for: direction(1B)||mac_prim(2B)||prf_prim(2B)||kdf_prim(2B)||elliptic_curve(2B)||ml_kem_seclvl(2B)||self_id(32B) ,where B means bytes
     unsigned char l_A[LABEL_SZ];    ///< Initializer label used in the PRF (represented as A in the original paper)
     unsigned char l_B[LABEL_SZ];    ///< Responder label used in the PRF (represented as B in the original paper)
     unsigned char l_CKEM[LABEL_SZ]; ///< Label used in the PRF to derive the classical key (refered as ck in the paper)
     unsigned char l_QKEM[LABEL_SZ]; ///< Label used in the PRF to derive the quantum key (refered as qk in the paper)
-    uint8_t header[HEADER_SZ];      ///< Current header for the protocol, have space for: direction(1B)||mac_prim(2B)||prf_prim(2B)||kdf_prim(2B)||elliptic_curve(2B)||ml_kem_seclvl(2B)||self_id(32B) ,where B means bytes
     uint8_t sec_st[SECST_SZ];       ///< Current secret state of the Muckle protocol (refered as SecState in the paper) 256 bit len
     uint8_t psk[PSK_SZ];            ///< Pre-shared Symmetric Keys that must be instanciated in the initialization (refered as PSK in the paper) 256 bits len
     uint8_t ctr[CTR_SZ];            ///< Counter that is incremented on each iteration of the protocol
     uint8_t sk[SK_SZ];              ///< Session key that is calculated after the entire protocol succed
     uint8_t sk_st;                  ///< Currennt State of thee session key
+    uint8_t macsign_k[SK_SZ];       ///< Symmetric key used for mac sign the output msgs
     mac_primitive mac_prim;         ///< MAC primitive that is going to be used in this instance of the protocol
     uint16_t mac_trunc;             ///< MAC tag truncation
     prf_primitive prf_prim;         ///< Pseudo Random Function (PRF) that is going to be used in this instance of the protocol
@@ -290,8 +309,8 @@ private:
     this implementation of the Muckle protocol only supports ECDH as classical KEM, and ML_KEM (Kyber currently) as post-quantum kem, in the future, cryptoagility
     for kem implementations should be implemented, but idk how to do it without a mess of a code with the current BOTAN API*/
 
-    Botan::ECDH_PrivateKey priv_ecdh_k;    ///< Elliptic Curve Diffie Hellman key exchange instanciation for the initializer
-    Botan::ML_KEM_PrivateKey priv_kyber_k; ///< ML_KEM priv key for the use of Kyber for the initializer
+    std::unique_ptr<Botan::ECDH_PrivateKey> ckem_priv_k;    ///< pointer to Elliptic Curve Diffie Hellman key exchange instanciation for the initializer
+    std::unique_ptr<Botan::ML_KEM_PrivateKey> qkem_priv_k;  ///< pointer to ML_KEM priv key for the use of Kyber for the initializer
 
     ////////////////////////// private_methods ////////////////////////
 
@@ -350,7 +369,7 @@ private:
      * @param in_buff_len Length of the input buffer.
      * @param out_buff  Pointer to the output buffer where the PRF result will be stored.
      */
-    void prf(const uint8_t *k, const uint8_t *in_buff, size_t in_buff_len, uint8_t out_buff);
+    void prf(const uint8_t *k, const uint8_t *in_buff, size_t in_buff_len, uint8_t *out_buff);
 
 public:
     ////////////////////////// public_methods ////////////////////////
@@ -380,7 +399,11 @@ public:
     key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM,uint8_t *sec_st,
                         uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c, ml_kem qkem_mode);
 
-    ~key_exchange_MUCKLE;
+    ~key_exchange_MUCKLE();
+
+    return_code send_m0(unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len);
+
+    
 };
 
 #endif

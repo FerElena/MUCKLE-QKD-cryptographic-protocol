@@ -295,6 +295,9 @@ private:
     uint8_t ctr[CTR_SZ];            ///< Counter that is incremented on each iteration of the protocol
     uint8_t sk[SK_SZ];              ///< Session key that is calculated after the entire protocol succed
     uint8_t sk_st;                  ///< Currennt State of thee session key
+    uint8_t csk[SK_SZ];             ///< Clasic Shared key from the classic kem protocol (ck in the paper)
+    uint8_t qsk[SK_SZ];             ///< Post-quantum shared key from the post-quantum ml_kem protocol (qk in the paper)
+    uint8_t chain_k[4][SK_SZ];      ///< Chain keys used for the mutual final key calculation(k0,k1,k2 and k3 in the paper)         
     uint8_t macsign_k[SK_SZ];       ///< Symmetric key used for mac sign the output msgs
     mac_primitive mac_prim;         ///< MAC primitive that is going to be used in this instance of the protocol
     uint16_t mac_trunc;             ///< MAC tag truncation

@@ -78,11 +78,11 @@ void key_exchange_MUCKLE::prf(const uint8_t *k, const uint8_t *in_buff, size_t i
  * Public methods implementation
  ****************************************************************************************************************/
 
-key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM,uint8_t *sec_st, uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c, ml_kem qkem_mode)
+key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM, uint8_t *sec_st, uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c, ml_kem qkem_mode)
 {
     // parameter checking, if invalid rol or invalid primitives, throw exception
     if (rol > 1 || l_A == nullptr || l_B == nullptr || l_CKEM == nullptr || l_QKEM == nullptr || sec_st == nullptr || psk == nullptr || mac_prim >= mac_primitive_size ||
-                 mac_trunc > 256 || prf_prim >= prf_primitive_size || kdf_prim >= prf_primitive_size || ecdh_c >= elliptic_curve_types_size || qkem_mode >= ml_kem_enum_size)
+        mac_trunc > 256 || prf_prim >= prf_primitive_size || kdf_prim >= prf_primitive_size || ecdh_c >= elliptic_curve_types_size || qkem_mode >= ml_kem_enum_size)
         throw invalid_argument("Incorrect input parameters on MUCKLE construction");
 
     // assign input data to the object, and set attributes as initialized
@@ -101,7 +101,7 @@ key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_
 
     // instanciate the selected cryptographic primitives
     this->mac_prim = mac_prim;
-    this->mac_trunc = mac_trunc;
+    this->mac_trunc = mac_trunc / 8; //put it in bytes
     this->prf_prim = prf_prim;
     this->kdf_prim = kdf_prim;
     this->ecdh_c = ecdh_c;
@@ -129,21 +129,25 @@ key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_
     if (itr != HEADER_SZ)
         throw invalid_argument("Incorrect input parameters on header construction");
 
-    //Create the private keys for both KEMs using dynamic memory with unique ptrs since botan developers decided "why would a programmer instantiate an uninitialized private key"
-    Botan::AutoSeeded_RNG rng; //rng for random key generation
-    //Create an instance of the selected elliptic curve, and a random number generator for EC Diffie-Hellman
-    const auto curve = Botan::EC_Group::from_name(elliptic_curve_names[ecdh_c]);
-    ckem_priv_k = make_unique<Botan::ECDH_PrivateKey>(rng,curve);
-    
-    //Usereate a Private ML_KEM key, and generate the corresponding public key
-    const auto rand = rng.random_array<16>();
-    if (this->qkem_mode == ml_kem_128) // ml_kem with 128 bits security
-        qkem_priv_k = make_unique<Botan::ML_KEM_PrivateKey>(rng,Botan::ML_KEM_Mode::ML_KEM_512);
-    else if(this->qkem_mode == ml_kem_192) // ml_kem with 192 bits security
-        qkem_priv_k = make_unique<Botan::ML_KEM_PrivateKey>(rng,Botan::ML_KEM_Mode::ML_KEM_768);
-    else // ml_kem with 256 bits security
-        qkem_priv_k = make_unique<Botan::ML_KEM_PrivateKey>(rng,Botan::ML_KEM_Mode::ML_KEM_1024);
+    // Create the private keys for both KEMs using dynamic memory with unique ptrs since botan developers decided "why would a programmer instantiate an uninitialized private key"
+    Botan::AutoSeeded_RNG rng; // Rng for random key generation
 
+    // Create an instance of the selected elliptic curve, and a random number generator for EC Diffie-Hellman(both initializer and responder)
+    const auto curve = Botan::EC_Group::from_name(elliptic_curve_names[ecdh_c]);
+    ckem_priv_k = make_unique<Botan::ECDH_PrivateKey>(rng, curve);
+
+    //If the role of the entity if an initializer, generate a private ml_kem key
+    if (this->rol == INITIALIZER)
+    {
+        // Usereate a Private ML_KEM key, and generate the corresponding public key
+        const auto rand = rng.random_array<16>();
+        if (this->qkem_mode == ml_kem_128) // ml_kem with 128 bits security
+            qkem_priv_k = make_unique<Botan::ML_KEM_PrivateKey>(rng, Botan::ML_KEM_Mode::ML_KEM_512);
+        else if (this->qkem_mode == ml_kem_192) // ml_kem with 192 bits security
+            qkem_priv_k = make_unique<Botan::ML_KEM_PrivateKey>(rng, Botan::ML_KEM_Mode::ML_KEM_768);
+        else // ml_kem with 256 bits security
+            qkem_priv_k = make_unique<Botan::ML_KEM_PrivateKey>(rng, Botan::ML_KEM_Mode::ML_KEM_1024);
+    }
 }
 
 key_exchange_MUCKLE::~key_exchange_MUCKLE()
@@ -153,8 +157,13 @@ key_exchange_MUCKLE::~key_exchange_MUCKLE()
     secure_zeroize(this->sec_st, SECST_SZ);
     secure_zeroize(this->sk, SK_SZ);
     secure_zeroize(this->psk, PSK_SZ);
-    secure_zeroize(this->macsign_k, PSK_SZ);
-    // Zeroize labels, but idk if this is necesary
+    secure_zeroize(this->macsign_k, SK_SZ);
+    secure_zeroize(this->csk, SK_SZ);
+    secure_zeroize(this->qsk, SK_SZ);
+    for(int i = 0 ; i < 4 ; i++){
+        secure_zeroize(this->chain_k[i],SK_SZ);
+    }
+    // Zeroize labels, but idk if this is necessary, probably not
     secure_zeroize(this->l_A, LABEL_SZ);
     secure_zeroize(this->l_B, LABEL_SZ);
     secure_zeroize(this->l_CKEM, LABEL_SZ);
@@ -167,23 +176,23 @@ return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size
         return return_code::INCORRECT_ROL_OPERATION;
     com_st = running_com;
     sk_st = SK_NOT_REVEALED;
-    
-    //get public keys with black magic of pointers
+
+    // get public keys with black magic of pointers
     const auto ckey_pub = ckem_priv_k.get()->public_value();
     const auto qkey_pub = qkem_priv_k.get()->public_key();
 
-    //BER encode ML_KEM public keys
-    vector<uint8_t> serialized_qkey_pub = Botan::X509::BER_encode(*qkey_pub.get()); //serialize qkey in BER format with some black magic of pointers
+    // BER encode ML_KEM public keys
+    vector<uint8_t> serialized_qkey_pub = Botan::X509::BER_encode(*qkey_pub.get()); // serialize qkey in BER format with some black magic of pointers
 
     // Calculate serialized keys len
     auto serialized_ckey_pub_len = ckey_pub.size();
     auto serialized_qkey_pub_len = serialized_qkey_pub.size();
 
-    //Calculate mac signing key
-    prf(psk,sec_st,SECST_SZ,macsign_k);
-    prf(macsign_k,l_A,LABEL_SZ,macsign_k);
+    // Calculate mac signing key
+    prf(psk, sec_st, SECST_SZ, macsign_k);
+    prf(macsign_k, l_A, LABEL_SZ, macsign_k);
 
-    //Allocate the output buffer
+    // Allocate the output buffer
     out_buff_len = HEADER_SZ + sizeof(size_t) + serialized_ckey_pub_len + sizeof(size_t) + serialized_qkey_pub_len + mac_trunc;
     try
     {
@@ -196,21 +205,21 @@ return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size
         return return_code::MEMORY_ALLOCATION_FAIL; // Return memory allocation failure
     }
 
-    //Construct the buffer to sign
+    // Construct the buffer to sign
     size_t itr = 0;
-    copy(header, header + HEADER_SZ, buffer_out.get()); //copy the header
-    itr+=HEADER_SZ;
-    copy(reinterpret_cast<const uint8_t *>(&serialized_ckey_pub_len), reinterpret_cast<const uint8_t *>(&serialized_ckey_pub_len) + sizeof(serialized_ckey_pub_len),buffer_out.get() + itr); // copy the len of ckey_pub
-    itr+=sizeof(serialized_ckey_pub_len);
-    copy(reinterpret_cast<const uint8_t *>(&ckey_pub), reinterpret_cast<const uint8_t *>(&ckey_pub) + serialized_ckey_pub_len, buffer_out.get() + itr); //copy ckey_pub
-    itr+=serialized_ckey_pub_len;
-    copy(reinterpret_cast<const uint8_t *>(&serialized_qkey_pub_len), reinterpret_cast<const uint8_t *>(&serialized_qkey_pub_len) + sizeof(serialized_qkey_pub_len),buffer_out.get() + itr); // copy the len of qkey_pub
-    itr+=sizeof(serialized_qkey_pub_len);
-    copy(reinterpret_cast<const uint8_t *>(&serialized_qkey_pub), reinterpret_cast<const uint8_t *>(&serialized_qkey_pub) + serialized_qkey_pub_len, buffer_out.get() + itr); //copy qkey_pub
-    itr+=serialized_qkey_pub_len;
+    copy(header, header + HEADER_SZ, buffer_out.get()); // copy the header
+    itr += HEADER_SZ;
+    copy(reinterpret_cast<const uint8_t *>(&serialized_ckey_pub_len), reinterpret_cast<const uint8_t *>(&serialized_ckey_pub_len) + sizeof(serialized_ckey_pub_len), buffer_out.get() + itr); // copy the len of ckey_pub
+    itr += sizeof(serialized_ckey_pub_len);
+    copy(reinterpret_cast<const uint8_t *>(&ckey_pub), reinterpret_cast<const uint8_t *>(&ckey_pub) + serialized_ckey_pub_len, buffer_out.get() + itr); // copy ckey_pub
+    itr += serialized_ckey_pub_len;
+    copy(reinterpret_cast<const uint8_t *>(&serialized_qkey_pub_len), reinterpret_cast<const uint8_t *>(&serialized_qkey_pub_len) + sizeof(serialized_qkey_pub_len), buffer_out.get() + itr); // copy the len of qkey_pub
+    itr += sizeof(serialized_qkey_pub_len);
+    copy(reinterpret_cast<const uint8_t *>(&serialized_qkey_pub), reinterpret_cast<const uint8_t *>(&serialized_qkey_pub) + serialized_qkey_pub_len, buffer_out.get() + itr); // copy qkey_pub
+    itr += serialized_qkey_pub_len;
 
-    //sign the buffer with the choosen mac signing algorithm
-    mac_sign(buffer_out.get(),itr,macsign_k,SK_SZ,buffer_out.get() + itr);
+    // sign the buffer with the choosen mac signing algorithm
+    mac_sign(buffer_out.get(), itr, macsign_k, SK_SZ, buffer_out.get() + itr);
 
     return return_code::MUCKLE_OK;
 }

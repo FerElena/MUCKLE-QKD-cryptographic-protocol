@@ -70,12 +70,12 @@ const uint8_t SALT_SZ = 16; //salt size if needed
 enum class return_code {
     MUCKLE_OK,
     INCORRECT_ROL_OPERATION,
-    RNG_GEN_FAIL,
     MEMORY_ALLOCATION_FAIL,
     MAC_SIGN_FAIL,
     DIFFERENT_PROTOCOL_CONFIG,
     INCORRECT_PARTNER,
     INCORRECT_PARAMETERS,
+    INCORRECT_COM_STATE,
     UNKNOWN_ERROR
 };
 
@@ -291,8 +291,8 @@ private:
     uint8_t header[HEADER_SZ];      ///< Current header for the protocol, have space for: direction(1B)||mac_prim(2B)||prf_prim(2B)||kdf_prim(2B)||elliptic_curve(2B)||ml_kem_seclvl(2B)||self_id(32B) ,where B means bytes
     unsigned char l_A[LABEL_SZ];    ///< Initializer label used in the PRF (represented as A in the original paper)
     unsigned char l_B[LABEL_SZ];    ///< Responder label used in the PRF (represented as B in the original paper)
-    unsigned char l_CKEM[LABEL_SZ]; ///< Label used in the PRF to derive the classical key (refered as ck in the paper)
-    unsigned char l_QKEM[LABEL_SZ]; ///< Label used in the PRF to derive the quantum key (refered as qk in the paper)
+    unsigned char l_ckem[LABEL_SZ]; ///< Label used in the PRF to derive the classical key (refered as ck in the paper)
+    unsigned char l_qkem[LABEL_SZ]; ///< Label used in the PRF to derive the quantum key (refered as qk in the paper)
     uint8_t sec_st[SECST_SZ];       ///< Current secret state of the Muckle protocol (refered as SecState in the paper) 256 bit len
     uint8_t psk[PSK_SZ];            ///< Pre-shared Symmetric Keys that must be instanciated in the initialization (refered as PSK in the paper) 256 bits len
     uint8_t ctr[CTR_SZ];            ///< Counter that is incremented on each iteration of the protocol
@@ -390,8 +390,8 @@ public:
      * @param p_id Pointer to the party identifier.
      * @param l_A Pointer to label A.
      * @param l_B Pointer to label B.
-     * @param l_CKEM Pointer to label CKEM.
-     * @param l_QKEM Pointer to label QKEM.
+     * @param l_ckem Pointer to label CKEM.
+     * @param l_qkem Pointer to label QKEM.
      * @param sec_st Pointer to the security state.
      * @param psk Pointer to the pre-shared key.
      * @param mac_prim MAC primitive.
@@ -402,7 +402,7 @@ public:
      *
      * @throws invalid_argument if any input parameter is invalid.
      */
-    key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM,uint8_t *sec_st,
+    key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_ckem, unsigned char *l_qkem,uint8_t *sec_st,
                         uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c, ml_kem qkem_mode);
 
     ~key_exchange_MUCKLE();
@@ -410,6 +410,10 @@ public:
     return_code send_m0(unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len);
 
     return_code recive_m0_send_m1(const unique_ptr<uint8_t[]> buffer_in, const size_t buffer_in_len, unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len);
+
+    return_code recive_m1(const unique_ptr<uint8_t[]> buffer_in, const size_t buffer_in_len);
+
+    return_code update_state(const unique_ptr<uint8_t[]> buffer_in_0, const size_t buffer_in_0_len,const unique_ptr<uint8_t[]> buffer_in_1, const size_t buffer_in_1_len);
 
     
 };

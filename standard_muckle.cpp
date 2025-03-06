@@ -19,21 +19,21 @@
  ****************************************************************************************************************/
 
 ////////////////////////////////////////////ONLY FOR TEST FUNCTION////////////////////////////////////////////
- void printHex(const unsigned char *buffer, size_t size)
+void printHex(const unsigned char *buffer, size_t size)
 {
-   for (size_t i = 0; i < size; ++i)
-   {
-      std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(buffer[i]);
-      if (i % 16 == 15)
-      {
-         std::cout << std::endl;
-      }
-      else
-      {
-         std::cout << ' ';
-      }
-   }
-   std::cout << std::dec << std::endl;
+    for (size_t i = 0; i < size; ++i)
+    {
+        std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(buffer[i]);
+        if (i % 16 == 15)
+        {
+            std::cout << std::endl;
+        }
+        else
+        {
+            std::cout << ' ';
+        }
+    }
+    std::cout << std::dec << std::endl;
 }
 ////////////////////////////////////////////ONLY FOR TEST FUNCTION////////////////////////////////////////////
 
@@ -89,10 +89,10 @@ void key_exchange_MUCKLE::prf(const uint8_t *k, const uint8_t *in_buff, size_t i
  * Public methods implementation
  ****************************************************************************************************************/
 
-key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_CKEM, unsigned char *l_QKEM, uint8_t *sec_st, uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c, ml_kem qkem_mode)
+key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_ckem, unsigned char *l_qkem, uint8_t *sec_st, uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c, ml_kem qkem_mode)
 {
     // parameter checking, if invalid rol or invalid primitives, throw exception
-    if (rol > 1 || l_A == nullptr || l_B == nullptr || l_CKEM == nullptr || l_QKEM == nullptr || sec_st == nullptr || psk == nullptr || mac_prim >= mac_primitive_size ||
+    if (rol > 1 || l_A == nullptr || l_B == nullptr || l_ckem == nullptr || l_qkem == nullptr || sec_st == nullptr || psk == nullptr || mac_prim >= mac_primitive_size ||
         mac_trunc > 256 || prf_prim >= prf_primitive_size || kdf_prim >= prf_primitive_size || ecdh_c >= elliptic_curve_types_size || qkem_mode >= ml_kem_enum_size)
         throw invalid_argument("Incorrect input parameters on MUCKLE construction");
 
@@ -103,8 +103,8 @@ key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_
     // copy the labels of this instantiation protocol
     memcpy(this->l_A, l_A, LABEL_SZ);
     memcpy(this->l_B, l_B, LABEL_SZ);
-    memcpy(this->l_CKEM, l_CKEM, LABEL_SZ);
-    memcpy(this->l_QKEM, l_QKEM, LABEL_SZ);
+    memcpy(this->l_ckem, l_ckem, LABEL_SZ);
+    memcpy(this->l_qkem, l_qkem, LABEL_SZ);
 
     // copy Critical Security Parameters
     memcpy(this->sec_st, sec_st, SECST_SZ);
@@ -112,7 +112,7 @@ key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_
 
     // instanciate the selected cryptographic primitives
     this->mac_prim = mac_prim;
-    this->mac_trunc = mac_trunc / 8; //put it in bytes
+    this->mac_trunc = mac_trunc / 8; // put it in bytes
     this->prf_prim = prf_prim;
     this->kdf_prim = kdf_prim;
     this->ecdh_c = ecdh_c;
@@ -147,7 +147,7 @@ key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_
     const auto curve = Botan::EC_Group::from_name(elliptic_curve_names[ecdh_c]);
     ckem_priv_k = make_unique<Botan::ECDH_PrivateKey>(rng, curve);
 
-    //If the role of the entity if an initializer, generate a private ml_kem key
+    // If the role of the entity if an initializer, generate a private ml_kem key
     if (this->rol == INITIALIZER)
     {
         // Usereate a Private ML_KEM key, and generate the corresponding public key
@@ -170,14 +170,15 @@ key_exchange_MUCKLE::~key_exchange_MUCKLE()
     secure_zeroize(this->macsign_k, SK_SZ);
     secure_zeroize(this->csk, SK_SZ);
     secure_zeroize(this->qsk, SK_SZ);
-    for(int i = 0 ; i < 4 ; i++){
-        secure_zeroize(this->chain_k[i],SK_SZ);
+    for (int i = 0; i < 4; i++)
+    {
+        secure_zeroize(this->chain_k[i], SK_SZ);
     }
     // Zeroize labels, but idk if this is necessary, probably not
     secure_zeroize(this->l_A, LABEL_SZ);
     secure_zeroize(this->l_B, LABEL_SZ);
-    secure_zeroize(this->l_CKEM, LABEL_SZ);
-    secure_zeroize(this->l_QKEM, LABEL_SZ);
+    secure_zeroize(this->l_ckem, LABEL_SZ);
+    secure_zeroize(this->l_qkem, LABEL_SZ);
 }
 
 return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len)
@@ -231,68 +232,72 @@ return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size
     // sign the buffer with the choosen mac signing algorithm
     mac_sign(buffer_out.get(), itr, macsign_k, SK_SZ, buffer_out.get() + itr);
 
-    return return_code::MUCKLE_OK; //everything ok
+    return return_code::MUCKLE_OK; // everything ok
 }
 
-return_code key_exchange_MUCKLE::recive_m0_send_m1(const unique_ptr<uint8_t[]> buffer_in, const size_t buffer_in_len, unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len){
+return_code key_exchange_MUCKLE::recive_m0_send_m1(const unique_ptr<uint8_t[]> buffer_in, const size_t buffer_in_len, unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len)
+{
     if (rol != RESPONDER)
         return return_code::INCORRECT_ROL_OPERATION;
+
+    // Parameter checking
+    if (buffer_in.get()[0] != INITIALIZER) // If the sender of the msg is not an initializer
+        return return_code::INCORRECT_ROL_OPERATION;
+    if (!ct_cmp(buffer_in.get() + sizeof(INITIALIZER), header + sizeof(INITIALIZER), HEADER_SZ - sizeof(INITIALIZER) - ID_SZ)) // The initializer protocol was configured in a different way than the responder protocol
+        return return_code::DIFFERENT_PROTOCOL_CONFIG;
+    if (!ct_cmp(buffer_in.get() + sizeof(INITIALIZER) + 10, p_id, ID_SZ)) // Check if it is the configured partner
+        return return_code::DIFFERENT_PROTOCOL_CONFIG;
+
     com_st = running_com;
     sk_st = SK_NOT_REVEALED;
 
-    //Parameter checking
-    if(buffer_in.get()[0] != INITIALIZER) //If the sender of the msg is not an initializer
-        return return_code::INCORRECT_ROL_OPERATION;
-    if(!ct_cmp(buffer_in.get()+sizeof(INITIALIZER),header + sizeof(INITIALIZER),HEADER_SZ - sizeof(INITIALIZER) - ID_SZ)) //The initializer protocol was configured in a different way than the responder protocol
-        return return_code::DIFFERENT_PROTOCOL_CONFIG;
-    if(!ct_cmp(buffer_in.get()+sizeof(INITIALIZER)+10, p_id,ID_SZ)) //Check if it is the configured partner
-        return return_code::DIFFERENT_PROTOCOL_CONFIG;
-
-    //Calculate m0 mac signing key
+    // Calculate m0 mac signing key
     prf(psk, sec_st, SECST_SZ, macsign_k);
     prf(macsign_k, l_A, LABEL_SZ, macsign_k);
 
-    //Verify the sign of the input msg with the responder secret information, if verification fails, return error code
-    if(!mac_verify(buffer_in.get(),buffer_in_len - mac_trunc,macsign_k,SK_SZ,buffer_in.get() + buffer_in_len - mac_trunc))
+    // Verify the sign of the input msg with the responder secret information, if verification fails, return error code
+    if (!mac_verify(buffer_in.get(), buffer_in_len - mac_trunc, macsign_k, SK_SZ, buffer_in.get() + buffer_in_len - mac_trunc)){
+        com_st = accepted_com;
         return return_code::MAC_SIGN_FAIL;
+    }
 
     ///////////////////////////////Calculate KEM shared keys//////////////////////////////
     uint32_t itr = HEADER_SZ;
 
-    //Copy the initializer classic kem pub key len
+    // Copy the initializer classic kem pub key len
     size_t i_ckem_pubk_len;
-    copy(reinterpret_cast<uint8_t*>(buffer_in.get() + itr),reinterpret_cast<uint8_t*>(buffer_in.get() + itr + sizeof(size_t)), reinterpret_cast<uint8_t*>(&i_ckem_pubk_len));
-    itr+=sizeof(size_t);
-    
-    //Calculate classic kem shared key
+    copy(reinterpret_cast<uint8_t *>(buffer_in.get() + itr), reinterpret_cast<uint8_t *>(buffer_in.get() + itr + sizeof(size_t)), reinterpret_cast<uint8_t *>(&i_ckem_pubk_len));
+    itr += sizeof(size_t);
+
+    // Calculate classic kem shared key
     Botan::AutoSeeded_RNG rng;
-    Botan::PK_Key_Agreement ka_b(*ckem_priv_k,rng,prf_botan_primitive_names[kdf_prim]);
-    auto sa = ka_b.derive_key(SK_SZ,span<const uint8_t>(buffer_in.get() + itr,i_ckem_pubk_len)).bits_of(); 
-    copy(sa.begin(),sa.end(),csk);
-    itr+=i_ckem_pubk_len;
+    Botan::PK_Key_Agreement ka_b(*ckem_priv_k, rng, prf_botan_primitive_names[kdf_prim]);
+    auto sa = ka_b.derive_key(SK_SZ, span<const uint8_t>(buffer_in.get() + itr, i_ckem_pubk_len)).bits_of();
+    copy(sa.begin(), sa.end(), csk);
+    itr += i_ckem_pubk_len;
 
-    //Copy the initializer classic kem pub key len
+    // Copy the initializer post-quantum kem pub key len
     size_t i_qkem_pubk_len;
-    copy(reinterpret_cast<uint8_t*>(buffer_in.get() + itr),reinterpret_cast<uint8_t*>(buffer_in.get() + itr + sizeof(size_t)), reinterpret_cast<uint8_t*>(&i_qkem_pubk_len));
-    itr+=sizeof(size_t);
-    
-    //Calculate Post-quantum kem shared key
-    unique_ptr<Botan::Public_Key> i_qkem_pubk  = Botan::X509::load_key(span<const uint8_t>(buffer_in.get() + itr,i_qkem_pubk_len));
-    Botan::PK_KEM_Encryptor enc(*i_qkem_pubk.get(),prf_botan_primitive_names[kdf_prim]);
-    const auto salt = rng.random_array<SALT_SZ>();
-    const auto kem_result = enc.encrypt(rng,SK_SZ,salt);
-    copy(kem_result.shared_key().begin(),kem_result.shared_key().end(),qsk);
+    copy(reinterpret_cast<uint8_t *>(buffer_in.get() + itr), reinterpret_cast<uint8_t *>(buffer_in.get() + itr + sizeof(size_t)), reinterpret_cast<uint8_t *>(&i_qkem_pubk_len));
+    itr += sizeof(size_t);
 
-    //Calculate responder pub keys
+    // Calculate Post-quantum kem shared key
+    unique_ptr<Botan::Public_Key> i_qkem_pubk = Botan::X509::load_key(span<const uint8_t>(buffer_in.get() + itr, i_qkem_pubk_len));
+    Botan::PK_KEM_Encryptor enc(*i_qkem_pubk.get(), prf_botan_primitive_names[kdf_prim]);
+    const auto salt = rng.random_array<SALT_SZ>();
+    const auto kem_result = enc.encrypt(rng, SK_SZ, salt);
+    copy(kem_result.shared_key().begin(), kem_result.shared_key().end(), qsk);
+
+    // Calculate responder pub keys
     const auto ckey_pub = ckem_priv_k.get()->public_value();
     const auto qkey_pub = kem_result.encapsulated_shared_key();
-    
-    //Calculate responder pub keys len
+
+    // Calculate responder pub keys len
     const auto ckey_pub_len = ckey_pub.size();
     const auto qkey_pub_len = qkey_pub.size();
 
     // Allocate the output buffer
-    out_buff_len = HEADER_SZ+ SALT_SZ + sizeof(size_t) + qkey_pub_len + sizeof(size_t) + ckey_pub_len + mac_trunc; // size of the output buffer
+    out_buff_len = HEADER_SZ + SALT_SZ + sizeof(size_t) + qkey_pub_len + sizeof(size_t) + ckey_pub_len + mac_trunc; // size of the output buffer
     try
     {
         buffer_out = make_unique<uint8_t[]>(out_buff_len); // setup the required length to store-> header_b||salt||size_qkey_pub||qkey_pub||size_ckey_pub||ckey_pub||mac_tag
@@ -309,7 +314,7 @@ return_code key_exchange_MUCKLE::recive_m0_send_m1(const unique_ptr<uint8_t[]> b
     copy(header, header + HEADER_SZ, buffer_out.get()); // copy the header
     itr += HEADER_SZ;
     copy(salt.begin(), salt.end(), buffer_out.get() + itr);
-    itr+= SALT_SZ;
+    itr += SALT_SZ;
     copy(reinterpret_cast<const uint8_t *>(&qkey_pub_len), reinterpret_cast<const uint8_t *>(&qkey_pub_len) + sizeof(qkey_pub_len), buffer_out.get() + itr); // copy the len of qkey_pub
     itr += sizeof(qkey_pub_len);
     copy(reinterpret_cast<const uint8_t *>(qkey_pub.data()), reinterpret_cast<const uint8_t *>(qkey_pub.data()) + qkey_pub_len, buffer_out.get() + itr); // copy qkey_pub
@@ -319,12 +324,77 @@ return_code key_exchange_MUCKLE::recive_m0_send_m1(const unique_ptr<uint8_t[]> b
     copy(reinterpret_cast<const uint8_t *>(ckey_pub.data()), reinterpret_cast<const uint8_t *>(ckey_pub.data()) + ckey_pub_len, buffer_out.get() + itr); // copy ckey_pub
     itr += ckey_pub_len;
 
-    //Calculate m1 mac signing key
+    // Calculate m1 mac signing key
     prf(psk, sec_st, SECST_SZ, macsign_k);
     prf(macsign_k, l_B, LABEL_SZ, macsign_k);
 
     // sign the buffer with the choosen mac signing algorithm
     mac_sign(buffer_out.get(), itr, macsign_k, SK_SZ, buffer_out.get() + itr);
 
-    return return_code::MUCKLE_OK; //everything ok
+    com_st = accepted_com;
+    return return_code::MUCKLE_OK; // everything ok
+}
+
+return_code key_exchange_MUCKLE::recive_m1(const unique_ptr<uint8_t[]> buffer_in, const size_t buffer_in_len)
+{
+    if (rol != INITIALIZER)
+        return return_code::INCORRECT_ROL_OPERATION;
+
+    // Parameter checking
+    if (buffer_in.get()[0] != RESPONDER) // If the sender of the msg is not a responder
+        return return_code::INCORRECT_ROL_OPERATION;
+    if (!ct_cmp(buffer_in.get() + sizeof(RESPONDER), header + sizeof(RESPONDER), HEADER_SZ - sizeof(INITIALIZER) - ID_SZ)) // The responder protocol was configured in a different way than the responder protocol
+        return return_code::DIFFERENT_PROTOCOL_CONFIG;
+    if (!ct_cmp(buffer_in.get() + sizeof(INITIALIZER) + 10, p_id, ID_SZ)) // Check if it is the configured partner
+        return return_code::DIFFERENT_PROTOCOL_CONFIG;
+
+    // Calculate m1 mac signing key
+    prf(psk, sec_st, SECST_SZ, macsign_k);
+    prf(macsign_k, l_B, LABEL_SZ, macsign_k);
+
+    // Verify the sign of the input msg with the responder secret information, if verification fails, return error code
+    if (!mac_verify(buffer_in.get(), buffer_in_len - mac_trunc, macsign_k, SK_SZ, buffer_in.get() + buffer_in_len - mac_trunc)){
+        com_st = rejected_com;
+        return return_code::MAC_SIGN_FAIL;
+    }
+        
+    ///////////////////////////////Calculate KEM shared keys//////////////////////////////
+    uint32_t itr = HEADER_SZ + SALT_SZ;
+    Botan::AutoSeeded_RNG rng;
+
+    // Copy the responder post-quantum kem pub key len
+    size_t i_qkem_pubk_len;
+    copy(reinterpret_cast<uint8_t *>(buffer_in.get() + itr), reinterpret_cast<uint8_t *>(buffer_in.get() + itr + sizeof(size_t)), reinterpret_cast<uint8_t *>(&i_qkem_pubk_len));
+    itr += sizeof(size_t);
+
+    // Calculate Post-quantum kem shared key
+    Botan::PK_KEM_Decryptor dec(*qkem_priv_k,rng,prf_botan_primitive_names[kdf_prim]);
+    auto qkem_sk = dec.decrypt(span<const uint8_t>(buffer_in.get()+itr, i_qkem_pubk_len),SK_SZ,span<const uint8_t>(buffer_in.get()+HEADER_SZ,SALT_SZ));
+    copy(qkem_sk.begin(),qkem_sk.end(),qsk);
+    itr+=i_qkem_pubk_len;
+
+    // Copy the responder classic kem pub key len
+    size_t i_ckem_pubk_len;
+    copy(reinterpret_cast<uint8_t *>(buffer_in.get() + itr), reinterpret_cast<uint8_t *>(buffer_in.get() + itr + sizeof(size_t)), reinterpret_cast<uint8_t *>(&i_ckem_pubk_len));
+    itr += sizeof(size_t);
+
+    // Calculate classic kem shared key
+    Botan::PK_Key_Agreement ka_a(*ckem_priv_k, rng, prf_botan_primitive_names[kdf_prim]);
+    auto sa = ka_a.derive_key(SK_SZ, span<const uint8_t>(buffer_in.get() + itr, i_ckem_pubk_len)).bits_of();
+    copy(sa.begin(), sa.end(), csk);
+    itr += i_ckem_pubk_len;
+
+    com_st = accepted_com;
+    return return_code::MUCKLE_OK; // everything ok
+}
+
+return_code key_exchange_MUCKLE::update_state(const unique_ptr<uint8_t[]> buffer_in_0, const size_t buffer_in_0_len,const unique_ptr<uint8_t[]> buffer_in_1, const size_t buffer_in_1_len){
+    if(com_st != accepted_com)
+        return return_code::INCORRECT_COM_STATE;
+    
+    //just perform the 7 pseudorandom functions (yes, 7 pseudorandom functions)
+    prf(csk,l_ckem,LABEL_SZ,csk);
+    prf(qsk,l_qkem,LABEL_SZ,qsk);
+
+    return return_code::MUCKLE_OK; // everything ok
 }

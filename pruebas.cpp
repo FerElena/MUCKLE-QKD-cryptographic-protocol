@@ -79,8 +79,8 @@ int main()
 
    uint8_t l_A[32] = {0};
    uint8_t l_B[32] = {0};
-   uint8_t l_CKEM[32] = {0};
-   uint8_t l_QKEM[32] = {0};
+   uint8_t l_ckem[32] = {0};
+   uint8_t l_qkem[32] = {0};
    uint8_t sec_state[32] = {0x32, 0x75, 0xAB, 0x4F, 0x91, 0xCA, 0x0E, 0x3D,
                             0x7A, 0xB6, 0x23, 0x8C, 0x5E, 0xD4, 0xFF, 0x12,
                             0x6B, 0xA3, 0x9F, 0x45, 0xE2, 0x38, 0x81, 0xBC,
@@ -101,15 +101,18 @@ int main()
    unique_ptr<uint8_t[]> buffer_1, buffer_2;
    size_t buffer_1_length,buffer_2_length;
 
-   key_exchange_MUCKLE mucke_initializer(INITIALIZER, i_id, r_id, l_A, l_B, l_CKEM, l_QKEM, sec_state, psk, hmac256_sha3_256, 256, hkdf_sha2_256, hkdf_sha2_256, secpk256r1_curve, ml_kem_256);
-   key_exchange_MUCKLE mucke_responder(RESPONDER, r_id, i_id, l_A, l_B, l_CKEM, l_QKEM, sec_state, psk, hmac256_sha3_256, 256, hkdf_sha2_256, hkdf_sha2_256, secpk256r1_curve, ml_kem_256);
+   key_exchange_MUCKLE muckle_initializer(INITIALIZER, i_id, r_id, l_A, l_B, l_ckem, l_qkem, sec_state, psk, hmac256_sha3_256, 256, hkdf_sha2_256, hkdf_sha2_256, secpk256r1_curve, ml_kem_256);
+   key_exchange_MUCKLE muckle_responder(RESPONDER, r_id, i_id, l_A, l_B, l_ckem, l_qkem, sec_state, psk, hmac256_sha3_256, 256, hkdf_sha2_256, hkdf_sha2_256, secpk256r1_curve, ml_kem_256);
 
-   int result = (int)mucke_initializer.send_m0(buffer_1,buffer_1_length);
+   int result = (int)muckle_initializer.send_m0(buffer_1,buffer_1_length);
    cout << "la longitud de m0 es : " << buffer_1_length << endl;
    cout<<"el resultado de la operacion es: "<< result << endl;
 
-   result = (int)mucke_responder.recive_m0_send_m1(move(buffer_1),buffer_1_length,buffer_2,buffer_2_length);
+   result = (int)muckle_responder.recive_m0_send_m1(move(buffer_1),buffer_1_length,buffer_2,buffer_2_length);
    cout << "la longitud de m0 es : " << buffer_2_length << endl;
+   cout<<"el resultado de la operacion es: "<< result << endl;
+
+   result = (int)muckle_initializer.recive_m1(move(buffer_2),buffer_2_length);
    cout<<"el resultado de la operacion es: "<< result << endl;
 
    return 0;

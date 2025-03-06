@@ -424,3 +424,10 @@ return_code key_exchange_MUCKLE::update_state(const uint8_t qkd_k[SK_SZ]){
 
     return return_code::MUCKLE_OK; // everything ok
 }
+
+return_code key_exchange_MUCKLE::get_sk(uint8_t out_sk[SK_SZ]){
+    if(sk_st != SK_REVEALED)
+        return return_code::INCORRECT_COM_STATE;
+    memcpy(out_sk,sk,SK_SZ);
+    return return_code::MUCKLE_OK; // everything ok
+}

@@ -54,20 +54,21 @@ const uint8_t SK_NOT_REVEALED = 0;
 const uint8_t SK_REVEALED = 1;
 
 // Sizes in bytes
-const uint8_t ID_SZ = 32; //ID size
-const uint8_t LABEL_SZ = 32; //labels size
+const uint8_t ID_SZ = 32;                                                  // ID size
+const uint8_t LABEL_SZ = 32;                                               // labels size
 const uint8_t HEADER_SZ = sizeof(INITIALIZER) + 2 + 2 + 2 + 2 + 2 + ID_SZ; // equal to 1 byte of rol + mac type + prf type + kdf type + elliptic curve type + kem seccurity + self id
-const uint8_t PSK_SZ = 32; //pre shared keys size
-const uint8_t SECST_SZ = 32; //secret state size
-const uint8_t CTR_SZ = 32; // counter size
-const uint8_t SK_SZ = 32; //symetric key size
-const uint8_t SALT_SZ = 16; //salt size if needed
+const uint8_t PSK_SZ = 32;                                                 // pre shared keys size
+const uint8_t SECST_SZ = 32;                                               // secret state size
+const uint8_t CTR_SZ = 32;                                                 // counter size
+const uint8_t SK_SZ = 32;                                                  // symetric key size
+const uint8_t SALT_SZ = 16;                                                // salt size if needed
 
 /**
  * @brief enum representing the possible return codes
  *
  */
-enum class return_code {
+enum class return_code
+{
     MUCKLE_OK,
     INCORRECT_ROL_OPERATION,
     MEMORY_ALLOCATION_FAIL,
@@ -213,8 +214,7 @@ const string elliptic_curve_names[elliptic_curve_types_size] = {
     "brainpool384r1",
     "brainpool512r1",
     "x25519",
-    "x448"
-};
+    "x448"};
 
 /**
  * @brief enum representing the ML_KEM security in relation with NIST security levels
@@ -300,7 +300,7 @@ private:
     uint8_t sk_st;                  ///< Currennt State of thee session key
     uint8_t csk[SK_SZ];             ///< Clasic Shared key from the classic kem protocol (ck in the paper)
     uint8_t qsk[SK_SZ];             ///< Post-quantum shared key from the post-quantum ml_kem protocol (qk in the paper)
-    uint8_t chain_k[4][SK_SZ];      ///< Chain keys used for the mutual final key calculation(k0,k1,k2 and k3 in the paper)         
+    uint8_t chain_k[4][SK_SZ];      ///< Chain keys used for the mutual final key calculation(k0,k1,k2 and k3 in the paper)
     uint8_t macsign_k[SK_SZ];       ///< Symmetric key used for mac sign the output msgs
     mac_primitive mac_prim;         ///< MAC primitive that is going to be used in this instance of the protocol
     uint16_t mac_trunc;             ///< MAC tag truncation
@@ -315,8 +315,8 @@ private:
     this implementation of the Muckle protocol only supports ECDH as classical KEM, and ML_KEM (Kyber currently) as post-quantum kem, in the future, cryptoagility
     for kem implementations should be implemented, but idk how to do it without a mess of a code with the current BOTAN API*/
 
-    std::unique_ptr<Botan::ECDH_PrivateKey> ckem_priv_k;    ///< pointer to Elliptic Curve Diffie Hellman key exchange instanciation for the initializer
-    std::unique_ptr<Botan::ML_KEM_PrivateKey> qkem_priv_k;  ///< pointer to ML_KEM priv key for the use of Kyber for the initializer
+    std::unique_ptr<Botan::ECDH_PrivateKey> ckem_priv_k;   ///< pointer to Elliptic Curve Diffie Hellman key exchange instanciation for the initializer
+    std::unique_ptr<Botan::ML_KEM_PrivateKey> qkem_priv_k; ///< pointer to ML_KEM priv key for the use of Kyber for the initializer
 
     ////////////////////////// private_methods ////////////////////////
 
@@ -402,20 +402,80 @@ public:
      *
      * @throws invalid_argument if any input parameter is invalid.
      */
-    key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_ckem, unsigned char *l_qkem,uint8_t *sec_st,
+    key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_id, unsigned char *l_A, unsigned char *l_B, unsigned char *l_ckem, unsigned char *l_qkem, uint8_t *sec_st,
                         uint8_t *psk, mac_primitive mac_prim, uint16_t mac_trunc, prf_primitive prf_prim, prf_primitive kdf_prim, elliptic_curve ecdh_c, ml_kem qkem_mode);
 
+    /**
+     * @brief Destructor for the key_exchange_MUCKLE class.
+     *
+     * This destructor securely zeroes out critical security parameters to ensure that
+     * sensitive information is not left in memory after the object is destroyed.
+     */
     ~key_exchange_MUCKLE();
 
+    /**
+     * @brief Sends the m0 message in the MUCKLE key exchange protocol.
+     *
+     * This method constructs and sends the M0 message, which includes the public keys
+     * and other necessary information for the key exchange. It allocates the required
+     * buffer, serializes the public keys, calculates the MAC signing key, and signs the
+     * message.
+     *
+     * @param buffer_out A reference to a unique_ptr where the output buffer will be stored.
+     * @param out_buff_len A reference to a size_t where the length of the output buffer will be stored.
+     * @return A return_code indicating the success or failure of the operation.
+     */
     return_code send_m0(unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len);
 
+    /**
+     * @brief Receives the M0 message and sends the M1 message in the MUCKLE key exchange protocol.
+     *
+     * This method handles the reception of the M0 message from the initializer and constructs the M1
+     * message to be sent back. It performs various checks, calculates shared keys, and signs the
+     * message before sending it.
+     *
+     * @param buffer_in A unique_ptr to the input buffer containing the M0 message.
+     * @param buffer_in_len The length of the input buffer.
+     * @param buffer_out A reference to a unique_ptr where the output buffer will be stored.
+     * @param out_buff_len A reference to a size_t where the length of the output buffer will be stored.
+     * @return A return_code indicating the success or failure of the operation.
+     */
     return_code recive_m0_send_m1(const unique_ptr<uint8_t[]> buffer_in, const size_t buffer_in_len, unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len);
 
+    /**
+     * @brief Receives the M1 message in the MUCKLE key exchange protocol.
+     *
+     * This method handles the reception of the M1 message from the responder. It performs various
+     * checks, verifies the MAC signature, calculates shared keys, and stores the message for later use.
+     *
+     * @param buffer_in A unique_ptr to the input buffer containing the M1 message.
+     * @param buffer_in_len The length of the input buffer.
+     * @return A return_code indicating the success or failure of the operation.
+     */
     return_code recive_m1(const unique_ptr<uint8_t[]> buffer_in, const size_t buffer_in_len);
 
+    /**
+     * @brief Updates the state in the MUCKLE key exchange protocol using the provided QKD key.
+     *
+     * This method performs a series of pseudorandom functions (PRFs) to update the state based on
+     * the provided quantum key distribution (QKD) key. It modifies internal state variables and increments
+     * the counter for the next iteration.
+     *
+     * @param qkd_k A constant array of uint8_t representing the QKD key.
+     * @return A return_code indicating the success or failure of the operation.
+     */
     return_code update_state(const uint8_t qkd_k[SK_SZ]);
 
-    
+    /**
+     * @brief Retrieves the session key (SK) in the MUCKLE key exchange protocol.
+     *
+     * This method copies the session key (SK) to the provided output buffer if the session key
+     * state is revealed. It returns an error code if the session key state is not correct.
+     *
+     * @param out_sk An array of uint8_t where the session key will be copied.
+     * @return A return_code indicating the success or failure of the operation.
+     */
+    return_code get_sk(uint8_t out_sk[SK_SZ]);
 };
 
 #endif

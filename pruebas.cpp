@@ -121,5 +121,17 @@ int main()
 
    muckle_initializer.update_state(qkd_key);
    muckle_responder.update_state(qkd_key);
+
+   uint8_t sk_a[32];
+   uint8_t sk_b[32];
+
+   muckle_initializer.get_sk(sk_a);
+   muckle_responder.get_sk(sk_b);
+
+   if(!memcmp(sk_a,sk_b,32))
+      cout<<"las dos claves son iguales!!!!"<<endl;
+   else
+      cout<<"puff nene no"<<endl;
+
    return 0;
 }

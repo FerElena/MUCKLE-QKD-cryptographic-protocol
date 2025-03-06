@@ -56,7 +56,7 @@ const uint8_t SK_REVEALED = 1;
 // SIZES
 const uint8_t ID_SZ = 32; //ID size
 const uint8_t LABEL_SZ = 32; //labels size
-const uint8_t HEADER_SZ = 1 + 2 + 2 + 2 + 2 + 2 + 32; // equal to 1 byte of rol + mac type + prf type + kdf type + elliptic curve type + kem seccurity + self id
+const uint8_t HEADER_SZ = sizeof(INITIALIZER) + 2 + 2 + 2 + 2 + 2 + ID_SZ; // equal to 1 byte of rol + mac type + prf type + kdf type + elliptic curve type + kem seccurity + self id
 const uint8_t PSK_SZ = 32; //pre shared keys size
 const uint8_t SECST_SZ = 32; //secret state size
 const uint8_t CTR_SZ = 32; // counter size
@@ -72,7 +72,9 @@ enum class return_code {
     RNG_GEN_FAIL,
     MEMORY_ALLOCATION_FAIL,
     MAC_SIGN_FAIL,
-    INCORRECT_INPUT,
+    DIFFERENT_PROTOCOL_CONFIG,
+    INCORRECT_PARTNER,
+    INCORRECT_PARAMETERS,
     UNKNOWN_ERROR
 };
 
@@ -405,6 +407,8 @@ public:
     ~key_exchange_MUCKLE();
 
     return_code send_m0(unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len);
+
+    return_code recive_m0_send_m1(const unique_ptr<uint8_t[]> buffer_in, const size_t buffer_in_len, unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len);
 
     
 };

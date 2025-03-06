@@ -193,7 +193,7 @@ return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size
     prf(macsign_k, l_A, LABEL_SZ, macsign_k);
 
     // Allocate the output buffer
-    out_buff_len = HEADER_SZ + sizeof(size_t) + serialized_ckey_pub_len + sizeof(size_t) + serialized_qkey_pub_len + mac_trunc;
+    out_buff_len = HEADER_SZ + sizeof(size_t) + serialized_ckey_pub_len + sizeof(size_t) + serialized_qkey_pub_len + mac_trunc; // size of the output buffer
     try
     {
         buffer_out = make_unique<uint8_t[]>(out_buff_len); // setup the required length to store-> header_a||size_ckey_pub||ckey_pub||size_qkey_pub||qkey_pub||mac_tag
@@ -221,5 +221,32 @@ return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size
     // sign the buffer with the choosen mac signing algorithm
     mac_sign(buffer_out.get(), itr, macsign_k, SK_SZ, buffer_out.get() + itr);
 
-    return return_code::MUCKLE_OK;
+    return return_code::MUCKLE_OK; //everything ok
+}
+
+return_code key_exchange_MUCKLE::recive_m0_send_m1(const unique_ptr<uint8_t[]> buffer_in, const size_t buffer_in_len, unique_ptr<uint8_t[]> &buffer_out, size_t &out_buff_len){
+    if (rol != RESPONDER)
+        return return_code::INCORRECT_ROL_OPERATION;
+    com_st = running_com;
+    sk_st = SK_NOT_REVEALED;
+
+    //Parameter checking
+    if(buffer_in.get()[0] != INITIALIZER) // if the sender of the msg is not an initializer
+        return return_code::INCORRECT_ROL_OPERATION;
+    if(!ct_cmp(buffer_in.get()+sizeof(INITIALIZER),header + sizeof(INITIALIZER),HEADER_SZ - sizeof(INITIALIZER) - ID_SZ)) //The initializer protocol was configured in a different way than the responder protocol
+        return return_code::DIFFERENT_PROTOCOL_CONFIG;
+    if(!ct_cmp(buffer_in.get()+sizeof(INITIALIZER)+10, p_id,ID_SZ)) //check if it is the configured partner
+        return return_code::DIFFERENT_PROTOCOL_CONFIG;
+
+    // Calculate mac signing key
+    prf(psk, sec_st, SECST_SZ, macsign_k);
+    prf(macsign_k, l_A, LABEL_SZ, macsign_k);
+
+    //verify the sign of the input msg with the responder secret information, if verification fails, return error code
+    if(!mac_verify(buffer_in.get(),buffer_in_len - mac_trunc,macsign_k,SK_SZ,buffer_in.get() + buffer_in_len - mac_trunc))
+        return return_code::MAC_SIGN_FAIL;
+
+    
+    
+    return return_code::MUCKLE_OK; //everything ok
 }

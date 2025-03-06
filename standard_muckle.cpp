@@ -187,7 +187,7 @@ return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size
     com_st = running_com;
     sk_st = SK_NOT_REVEALED;
 
-    // get public keys with black magic of pointers
+    // get initializer public keys with black magic of pointers
     const auto ckey_pub = ckem_priv_k.get()->public_value();
     const auto qkey_pub = qkem_priv_k.get()->public_key();
 
@@ -195,12 +195,8 @@ return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size
     vector<uint8_t> serialized_qkey_pub = Botan::X509::BER_encode(*qkey_pub.get()); // serialize qkey in BER format with some black magic of pointers
 
     // Calculate serialized keys len
-    auto serialized_ckey_pub_len = ckey_pub.size();
-    auto serialized_qkey_pub_len = serialized_qkey_pub.size();
-
-    // Calculate mac signing key
-    prf(psk, sec_st, SECST_SZ, macsign_k);
-    prf(macsign_k, l_A, LABEL_SZ, macsign_k);
+    const auto serialized_ckey_pub_len = ckey_pub.size();
+    const auto serialized_qkey_pub_len = serialized_qkey_pub.size();
 
     // Allocate the output buffer
     out_buff_len = HEADER_SZ + sizeof(size_t) + serialized_ckey_pub_len + sizeof(size_t) + serialized_qkey_pub_len + mac_trunc; // size of the output buffer
@@ -228,6 +224,10 @@ return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size
     copy(reinterpret_cast<const uint8_t *>(serialized_qkey_pub.data()), reinterpret_cast<const uint8_t *>(serialized_qkey_pub.data()) + serialized_qkey_pub_len, buffer_out.get() + itr); // copy qkey_pub
     itr += serialized_qkey_pub_len;
 
+    // Calculate mac signing key
+    prf(psk, sec_st, SECST_SZ, macsign_k);
+    prf(macsign_k, l_A, LABEL_SZ, macsign_k);
+
     // sign the buffer with the choosen mac signing algorithm
     mac_sign(buffer_out.get(), itr, macsign_k, SK_SZ, buffer_out.get() + itr);
 
@@ -248,7 +248,7 @@ return_code key_exchange_MUCKLE::recive_m0_send_m1(const unique_ptr<uint8_t[]> b
     if(!ct_cmp(buffer_in.get()+sizeof(INITIALIZER)+10, p_id,ID_SZ)) //Check if it is the configured partner
         return return_code::DIFFERENT_PROTOCOL_CONFIG;
 
-    //Calculate mac signing key
+    //Calculate m0 mac signing key
     prf(psk, sec_st, SECST_SZ, macsign_k);
     prf(macsign_k, l_A, LABEL_SZ, macsign_k);
 
@@ -267,7 +267,7 @@ return_code key_exchange_MUCKLE::recive_m0_send_m1(const unique_ptr<uint8_t[]> b
     //Calculate classic kem shared key
     Botan::AutoSeeded_RNG rng;
     Botan::PK_Key_Agreement ka_b(*ckem_priv_k,rng,prf_botan_primitive_names[kdf_prim]);
-    auto sa = ka_b.derive_key(32,span<const uint8_t>(buffer_in.get() + itr,i_ckem_pubk_len)).bits_of(); 
+    auto sa = ka_b.derive_key(SK_SZ,span<const uint8_t>(buffer_in.get() + itr,i_ckem_pubk_len)).bits_of(); 
     copy(sa.begin(),sa.end(),csk);
     itr+=i_ckem_pubk_len;
 
@@ -277,9 +277,54 @@ return_code key_exchange_MUCKLE::recive_m0_send_m1(const unique_ptr<uint8_t[]> b
     itr+=sizeof(size_t);
     
     //Calculate Post-quantum kem shared key
-    //unique_ptr<Public_key> i_qkem_pubk  = Botan::X509::load_key(span<const uint8_t>(buffer_in.get() + itr));
+    unique_ptr<Botan::Public_Key> i_qkem_pubk  = Botan::X509::load_key(span<const uint8_t>(buffer_in.get() + itr,i_qkem_pubk_len));
+    Botan::PK_KEM_Encryptor enc(*i_qkem_pubk.get(),prf_botan_primitive_names[kdf_prim]);
+    const auto salt = rng.random_array<SALT_SZ>();
+    const auto kem_result = enc.encrypt(rng,SK_SZ,salt);
+    copy(kem_result.shared_key().begin(),kem_result.shared_key().end(),qsk);
 
+    //Calculate responder pub keys
+    const auto ckey_pub = ckem_priv_k.get()->public_value();
+    const auto qkey_pub = kem_result.encapsulated_shared_key();
+    
+    //Calculate responder pub keys len
+    const auto ckey_pub_len = ckey_pub.size();
+    const auto qkey_pub_len = qkey_pub.size();
 
+    // Allocate the output buffer
+    out_buff_len = HEADER_SZ+ SALT_SZ + sizeof(size_t) + qkey_pub_len + sizeof(size_t) + ckey_pub_len + mac_trunc; // size of the output buffer
+    try
+    {
+        buffer_out = make_unique<uint8_t[]>(out_buff_len); // setup the required length to store-> header_b||salt||size_qkey_pub||qkey_pub||size_ckey_pub||ckey_pub||mac_tag
+    }
+    catch (const bad_alloc &e)
+    {
+        cerr << "Memory allocation error: " << e.what() << endl;
+        this->com_st = rejected_com;
+        return return_code::MEMORY_ALLOCATION_FAIL; // Return memory allocation failure
+    }
+
+    // Construct the buffer to sign
+    itr = 0;
+    copy(header, header + HEADER_SZ, buffer_out.get()); // copy the header
+    itr += HEADER_SZ;
+    copy(salt.begin(), salt.end(), buffer_out.get() + itr);
+    itr+= SALT_SZ;
+    copy(reinterpret_cast<const uint8_t *>(&qkey_pub_len), reinterpret_cast<const uint8_t *>(&qkey_pub_len) + sizeof(qkey_pub_len), buffer_out.get() + itr); // copy the len of qkey_pub
+    itr += sizeof(qkey_pub_len);
+    copy(reinterpret_cast<const uint8_t *>(qkey_pub.data()), reinterpret_cast<const uint8_t *>(qkey_pub.data()) + qkey_pub_len, buffer_out.get() + itr); // copy qkey_pub
+    itr += qkey_pub_len;
+    copy(reinterpret_cast<const uint8_t *>(&ckey_pub_len), reinterpret_cast<const uint8_t *>(&ckey_pub_len) + sizeof(ckey_pub_len), buffer_out.get() + itr); // copy the len of ckey_pub
+    itr += sizeof(ckey_pub_len);
+    copy(reinterpret_cast<const uint8_t *>(ckey_pub.data()), reinterpret_cast<const uint8_t *>(ckey_pub.data()) + ckey_pub_len, buffer_out.get() + itr); // copy ckey_pub
+    itr += ckey_pub_len;
+
+    //Calculate m1 mac signing key
+    prf(psk, sec_st, SECST_SZ, macsign_k);
+    prf(macsign_k, l_B, LABEL_SZ, macsign_k);
+
+    // sign the buffer with the choosen mac signing algorithm
+    mac_sign(buffer_out.get(), itr, macsign_k, SK_SZ, buffer_out.get() + itr);
 
     return return_code::MUCKLE_OK; //everything ok
 }

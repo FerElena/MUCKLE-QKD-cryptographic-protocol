@@ -61,6 +61,7 @@ const uint8_t PSK_SZ = 32; //pre shared keys size
 const uint8_t SECST_SZ = 32; //secret state size
 const uint8_t CTR_SZ = 32; // counter size
 const uint8_t SK_SZ = 32; //symetric key size
+const uint8_t SALT_SZ = 16; //salt size if needed
 
 /**
  * @brief enum representing the possible return codes

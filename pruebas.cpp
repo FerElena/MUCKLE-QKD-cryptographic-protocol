@@ -104,10 +104,13 @@ int main()
    key_exchange_MUCKLE mucke_initializer(INITIALIZER, i_id, r_id, l_A, l_B, l_CKEM, l_QKEM, sec_state, psk, hmac256_sha3_256, 256, hkdf_sha2_256, hkdf_sha2_256, secpk256r1_curve, ml_kem_256);
    key_exchange_MUCKLE mucke_responder(RESPONDER, r_id, i_id, l_A, l_B, l_CKEM, l_QKEM, sec_state, psk, hmac256_sha3_256, 256, hkdf_sha2_256, hkdf_sha2_256, secpk256r1_curve, ml_kem_256);
 
-   mucke_initializer.send_m0(buffer_1,buffer_1_length);
+   int result = (int)mucke_initializer.send_m0(buffer_1,buffer_1_length);
    cout << "la longitud de m0 es : " << buffer_1_length << endl;
-
-   int result = (int)mucke_responder.recive_m0_send_m1(move(buffer_1),buffer_1_length,buffer_2,buffer_2_length);
    cout<<"el resultado de la operacion es: "<< result << endl;
+
+   result = (int)mucke_responder.recive_m0_send_m1(move(buffer_1),buffer_1_length,buffer_2,buffer_2_length);
+   cout << "la longitud de m0 es : " << buffer_2_length << endl;
+   cout<<"el resultado de la operacion es: "<< result << endl;
+
    return 0;
 }

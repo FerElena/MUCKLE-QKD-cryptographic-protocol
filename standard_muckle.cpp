@@ -121,6 +121,7 @@ key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_
     // build first instance atributes
     this->com_st = void_com;
     this->sk_st = SK_NOT_REVEALED;
+    for(int i = 0 ; i < CTR_SZ ; this->ctr[i++] = 0);
 
     // build header
     uint16_t itr = 0;
@@ -232,6 +233,10 @@ return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size
     // sign the buffer with the choosen mac signing algorithm
     mac_sign(buffer_out.get(), itr, macsign_k, SK_SZ, buffer_out.get() + itr);
 
+    // store the created mesage for later(update_key operation)
+    m0m1_aux.resize(itr);
+    copy(buffer_out.get(),buffer_out.get()+itr,m0m1_aux.begin());
+
     return return_code::MUCKLE_OK; // everything ok
 }
 
@@ -331,6 +336,12 @@ return_code key_exchange_MUCKLE::recive_m0_send_m1(const unique_ptr<uint8_t[]> b
     // sign the buffer with the choosen mac signing algorithm
     mac_sign(buffer_out.get(), itr, macsign_k, SK_SZ, buffer_out.get() + itr);
 
+    // store the created mesages for later(update_key operation)
+    size_t m0m1_size = buffer_in_len + out_buff_len - (mac_trunc*2) + CTR_SZ;
+    m0m1_aux.resize(m0m1_size);
+    copy(buffer_in.get(),buffer_in.get()+buffer_in_len - mac_trunc,m0m1_aux.begin());
+    copy(buffer_out.get(),buffer_out.get() + out_buff_len - mac_trunc,m0m1_aux.begin() +buffer_in_len - mac_trunc);
+
     com_st = accepted_com;
     return return_code::MUCKLE_OK; // everything ok
 }
@@ -384,17 +395,32 @@ return_code key_exchange_MUCKLE::recive_m1(const unique_ptr<uint8_t[]> buffer_in
     copy(sa.begin(), sa.end(), csk);
     itr += i_ckem_pubk_len;
 
+    // store the created mesage for later(update_key operation)
+    size_t m0_size = m0m1_aux.size();
+    size_t m0m1_size = m0_size + buffer_in_len - mac_trunc + CTR_SZ;
+    m0m1_aux.resize(m0m1_size);
+    copy(buffer_in.get(),buffer_in.get()+buffer_in_len - mac_trunc,m0m1_aux.begin() + m0_size);
+
     com_st = accepted_com;
     return return_code::MUCKLE_OK; // everything ok
 }
 
-return_code key_exchange_MUCKLE::update_state(const unique_ptr<uint8_t[]> buffer_in_0, const size_t buffer_in_0_len,const unique_ptr<uint8_t[]> buffer_in_1, const size_t buffer_in_1_len){
+return_code key_exchange_MUCKLE::update_state(const uint8_t qkd_k[SK_SZ]){
     if(com_st != accepted_com)
         return return_code::INCORRECT_COM_STATE;
     
     //just perform the 7 pseudorandom functions (yes, 7 pseudorandom functions)
     prf(csk,l_ckem,LABEL_SZ,csk);
     prf(qsk,l_qkem,LABEL_SZ,qsk);
+    prf(qsk,m0m1_aux.data(),m0m1_aux.size() - CTR_SZ,chain_k[0]);
+    prf(csk,chain_k[0],SK_SZ,chain_k[1]);
+    prf(qkd_k,chain_k[1],SK_SZ,chain_k[2]);
+    prf(chain_k[2],sec_st,SECST_SZ,chain_k[3]);
+    copy(ctr,ctr+CTR_SZ,m0m1_aux.end() - CTR_SZ);
+    prf(chain_k[3],m0m1_aux.data(),m0m1_aux.size(),sk);
+    memcpy(sec_st,sk,SK_SZ);
+    inc_ctr(ctr); //increment the counter for next iteration
+    sk_st = SK_REVEALED;
 
     return return_code::MUCKLE_OK; // everything ok
 }

@@ -53,7 +53,7 @@ const uint8_t RESPONDER = 1;
 const uint8_t SK_NOT_REVEALED = 0;
 const uint8_t SK_REVEALED = 1;
 
-// SIZES
+// Sizes in bytes
 const uint8_t ID_SZ = 32; //ID size
 const uint8_t LABEL_SZ = 32; //labels size
 const uint8_t HEADER_SZ = sizeof(INITIALIZER) + 2 + 2 + 2 + 2 + 2 + ID_SZ; // equal to 1 byte of rol + mac type + prf type + kdf type + elliptic curve type + kem seccurity + self id
@@ -308,7 +308,7 @@ private:
     prf_primitive kdf_prim;         ///< Key derivation function used to derive the key in the classic and post-quantum KEM
     elliptic_curve ecdh_c;          ///< Elliptic curve that will be utilized in the ECDH key exchange
     ml_kem qkem_mode;               ///< Post-quantum KEM security level choosen
-
+    vector<uint8_t> m0m1_aux;       ///< auxiliar vector to store the created messages m0 and m1
 
     /* the private and public keys of asymmetric cryptography cannot be crypto-agile, since in the botan library and most libraries are defined with a specific structure for
     the algorithm,because they are not simply a stream of bits in an array, but an object representing mathematical properties specific to the algorithm, so currently
@@ -413,7 +413,7 @@ public:
 
     return_code recive_m1(const unique_ptr<uint8_t[]> buffer_in, const size_t buffer_in_len);
 
-    return_code update_state(const unique_ptr<uint8_t[]> buffer_in_0, const size_t buffer_in_0_len,const unique_ptr<uint8_t[]> buffer_in_1, const size_t buffer_in_1_len);
+    return_code update_state(const uint8_t qkd_k[SK_SZ]);
 
     
 };

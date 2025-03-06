@@ -18,23 +18,6 @@
 
 using namespace std;
 
-void printHex(const unsigned char *buffer, size_t size)
-{
-   for (size_t i = 0; i < size; ++i)
-   {
-      std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(buffer[i]);
-      if (i % 16 == 15)
-      {
-         std::cout << std::endl;
-      }
-      else
-      {
-         std::cout << ' ';
-      }
-   }
-   std::cout << std::dec << std::endl;
-}
-
 int main()
 {
    // ECDH

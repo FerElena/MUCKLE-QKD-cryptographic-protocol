@@ -18,6 +18,25 @@
  * Private methods/functions implementation
  ****************************************************************************************************************/
 
+////////////////////////////////////////////ONLY FOR TEST FUNCTION////////////////////////////////////////////
+ void printHex(const unsigned char *buffer, size_t size)
+{
+   for (size_t i = 0; i < size; ++i)
+   {
+      std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(buffer[i]);
+      if (i % 16 == 15)
+      {
+         std::cout << std::endl;
+      }
+      else
+      {
+         std::cout << ' ';
+      }
+   }
+   std::cout << std::dec << std::endl;
+}
+////////////////////////////////////////////ONLY FOR TEST FUNCTION////////////////////////////////////////////
+
 void key_exchange_MUCKLE::mac_sign(const uint8_t *msg, const size_t msg_len, const uint8_t *k, const size_t k_len, uint8_t *tag)
 {
     auto mac = Botan::MessageAuthenticationCode::create_or_throw(hmac_botan_primitive_names[mac_prim]); // create an instance of a mac
@@ -29,20 +48,12 @@ void key_exchange_MUCKLE::mac_sign(const uint8_t *msg, const size_t msg_len, con
 
 bool key_exchange_MUCKLE::ct_cmp(const uint8_t *array1, const uint8_t *array2, size_t length)
 {
-    // Initialize the result variable to zero.
-    // This variable will accumulate the differences between the arrays.
     uint8_t result = 0;
-
-    // Iterate through each byte of the arrays.
     for (size_t i = 0; i < length; ++i)
     {
-        // Use XOR to compare the bytes and accumulate the differences.
         result |= array1[i] ^ array2[i];
     }
-
-    // The result will be 0 if and only if all bytes are equal.
-    // If there is any difference, the result will be non-zero.
-    return result == 0;
+    return result == 0; // is arrays are equal return true, else return false
 }
 
 int key_exchange_MUCKLE::mac_verify(const uint8_t *msg, const size_t msg_len, const uint8_t *k, const size_t k_len, const uint8_t *tag)
@@ -140,7 +151,6 @@ key_exchange_MUCKLE::key_exchange_MUCKLE(uint8_t rol, uint8_t *s_id, uint8_t *p_
     if (this->rol == INITIALIZER)
     {
         // Usereate a Private ML_KEM key, and generate the corresponding public key
-        const auto rand = rng.random_array<16>();
         if (this->qkem_mode == ml_kem_128) // ml_kem with 128 bits security
             qkem_priv_k = make_unique<Botan::ML_KEM_PrivateKey>(rng, Botan::ML_KEM_Mode::ML_KEM_512);
         else if (this->qkem_mode == ml_kem_192) // ml_kem with 192 bits security
@@ -211,11 +221,11 @@ return_code key_exchange_MUCKLE::send_m0(unique_ptr<uint8_t[]> &buffer_out, size
     itr += HEADER_SZ;
     copy(reinterpret_cast<const uint8_t *>(&serialized_ckey_pub_len), reinterpret_cast<const uint8_t *>(&serialized_ckey_pub_len) + sizeof(serialized_ckey_pub_len), buffer_out.get() + itr); // copy the len of ckey_pub
     itr += sizeof(serialized_ckey_pub_len);
-    copy(reinterpret_cast<const uint8_t *>(&ckey_pub), reinterpret_cast<const uint8_t *>(&ckey_pub) + serialized_ckey_pub_len, buffer_out.get() + itr); // copy ckey_pub
+    copy(reinterpret_cast<const uint8_t *>(ckey_pub.data()), reinterpret_cast<const uint8_t *>(ckey_pub.data()) + serialized_ckey_pub_len, buffer_out.get() + itr); // copy ckey_pub
     itr += serialized_ckey_pub_len;
     copy(reinterpret_cast<const uint8_t *>(&serialized_qkey_pub_len), reinterpret_cast<const uint8_t *>(&serialized_qkey_pub_len) + sizeof(serialized_qkey_pub_len), buffer_out.get() + itr); // copy the len of qkey_pub
     itr += sizeof(serialized_qkey_pub_len);
-    copy(reinterpret_cast<const uint8_t *>(&serialized_qkey_pub), reinterpret_cast<const uint8_t *>(&serialized_qkey_pub) + serialized_qkey_pub_len, buffer_out.get() + itr); // copy qkey_pub
+    copy(reinterpret_cast<const uint8_t *>(serialized_qkey_pub.data()), reinterpret_cast<const uint8_t *>(serialized_qkey_pub.data()) + serialized_qkey_pub_len, buffer_out.get() + itr); // copy qkey_pub
     itr += serialized_qkey_pub_len;
 
     // sign the buffer with the choosen mac signing algorithm
@@ -231,22 +241,45 @@ return_code key_exchange_MUCKLE::recive_m0_send_m1(const unique_ptr<uint8_t[]> b
     sk_st = SK_NOT_REVEALED;
 
     //Parameter checking
-    if(buffer_in.get()[0] != INITIALIZER) // if the sender of the msg is not an initializer
+    if(buffer_in.get()[0] != INITIALIZER) //If the sender of the msg is not an initializer
         return return_code::INCORRECT_ROL_OPERATION;
     if(!ct_cmp(buffer_in.get()+sizeof(INITIALIZER),header + sizeof(INITIALIZER),HEADER_SZ - sizeof(INITIALIZER) - ID_SZ)) //The initializer protocol was configured in a different way than the responder protocol
         return return_code::DIFFERENT_PROTOCOL_CONFIG;
-    if(!ct_cmp(buffer_in.get()+sizeof(INITIALIZER)+10, p_id,ID_SZ)) //check if it is the configured partner
+    if(!ct_cmp(buffer_in.get()+sizeof(INITIALIZER)+10, p_id,ID_SZ)) //Check if it is the configured partner
         return return_code::DIFFERENT_PROTOCOL_CONFIG;
 
-    // Calculate mac signing key
+    //Calculate mac signing key
     prf(psk, sec_st, SECST_SZ, macsign_k);
     prf(macsign_k, l_A, LABEL_SZ, macsign_k);
 
-    //verify the sign of the input msg with the responder secret information, if verification fails, return error code
+    //Verify the sign of the input msg with the responder secret information, if verification fails, return error code
     if(!mac_verify(buffer_in.get(),buffer_in_len - mac_trunc,macsign_k,SK_SZ,buffer_in.get() + buffer_in_len - mac_trunc))
         return return_code::MAC_SIGN_FAIL;
 
+    ///////////////////////////////Calculate KEM shared keys//////////////////////////////
+    uint32_t itr = HEADER_SZ;
+
+    //Copy the initializer classic kem pub key len
+    size_t i_ckem_pubk_len;
+    copy(reinterpret_cast<uint8_t*>(buffer_in.get() + itr),reinterpret_cast<uint8_t*>(buffer_in.get() + itr + sizeof(size_t)), reinterpret_cast<uint8_t*>(&i_ckem_pubk_len));
+    itr+=sizeof(size_t);
     
+    //Calculate classic kem shared key
+    Botan::AutoSeeded_RNG rng;
+    Botan::PK_Key_Agreement ka_b(*ckem_priv_k,rng,prf_botan_primitive_names[kdf_prim]);
+    auto sa = ka_b.derive_key(32,span<const uint8_t>(buffer_in.get() + itr,i_ckem_pubk_len)).bits_of(); 
+    copy(sa.begin(),sa.end(),csk);
+    itr+=i_ckem_pubk_len;
+
+    //Copy the initializer classic kem pub key len
+    size_t i_qkem_pubk_len;
+    copy(reinterpret_cast<uint8_t*>(buffer_in.get() + itr),reinterpret_cast<uint8_t*>(buffer_in.get() + itr + sizeof(size_t)), reinterpret_cast<uint8_t*>(&i_qkem_pubk_len));
+    itr+=sizeof(size_t);
     
+    //Calculate Post-quantum kem shared key
+    //unique_ptr<Public_key> i_qkem_pubk  = Botan::X509::load_key(span<const uint8_t>(buffer_in.get() + itr));
+
+
+
     return return_code::MUCKLE_OK; //everything ok
 }

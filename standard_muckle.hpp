@@ -383,7 +383,8 @@ public:
     /**
      * @brief Constructor for the key_exchange_MUCKLE class.
      *
-     * Initializes a MUCKLE key exchange object with the provided parameters, performing necessary parameter checks and assignments.
+     * Initializes a MUCKLE key exchange object with the provided parameters, performing necessary parameter checks and assignments,
+     * and creating the necessary private KEM keys.
      *
      * @param rol Role identifier (0 or 1).
      * @param s_id Pointer to the session identifier.
@@ -416,10 +417,16 @@ public:
     /**
      * @brief Sends the m0 message in the MUCKLE key exchange protocol.
      *
-     * This method constructs and sends the M0 message, which includes the public keys
-     * and other necessary information for the key exchange. It allocates the required
-     * buffer, serializes the public keys, calculates the MAC signing key, and signs the
-     * message.
+     * This method constructs and sends the M0 message to the responder, both classic KEM and
+     * post-quantum KEM public keys are serialized and concatenated in m0 message, and signed 
+     * with a simetric mac sign, the output buffer structure is:
+     * 
+     * Buffer_out Layout:
+     * |-----------|------------|-----------------|-------------|------------------|-----------|
+     * | Header_a  | ckem_pubk  | ckem_serialized |  qkem_pubk  | qkem_serizalized |  MAC_tag  |
+     * |           |    size    |     pub_key     |             |    pub_key       |           |
+     * |----------.|------------|-----------------|-------------|------------------|-----------|
+     * 
      *
      * @param buffer_out A reference to a unique_ptr where the output buffer will be stored.
      * @param out_buff_len A reference to a size_t where the length of the output buffer will be stored.
@@ -430,10 +437,17 @@ public:
     /**
      * @brief Receives the M0 message and sends the M1 message in the MUCKLE key exchange protocol.
      *
-     * This method handles the reception of the M0 message from the initializer and constructs the M1
-     * message to be sent back. It performs various checks, calculates shared keys, and signs the
-     * message before sending it.
-     *
+     * This method handles the reception of the M0 message from the initializer,check the selected
+     * primitives are the same, extracts the initializer public keys,calculates its own public keys
+     * calculates shared secrets,stores the message fro later use, builds an output buffer with its
+     * public keys, and sends it to the initializer next to a simetric mac sign, the output buffer layout is:
+     * 
+     * |-----------|------------|------------|-----------------|-------------|------------------|-----------|
+     * | Header_b  |    qkem    | qkem_pubk  | qkem_serialized |  ckem_pubk  | ckem_serizalized |  MAC_tag  |
+     * |           |    salt    |    size    |     pub_key     |             |    pub_key       |           |
+     * |----------.|------------|------------|-----------------|-------------|------------------|-----------|
+     * 
+     * 
      * @param buffer_in A unique_ptr to the input buffer containing the M0 message.
      * @param buffer_in_len The length of the input buffer.
      * @param buffer_out A reference to a unique_ptr where the output buffer will be stored.
@@ -446,7 +460,7 @@ public:
      * @brief Receives the M1 message in the MUCKLE key exchange protocol.
      *
      * This method handles the reception of the M1 message from the responder. It performs various
-     * checks, verifies the MAC signature, calculates shared keys, and stores the message for later use.
+     * checks, verifies the MAC tag signature, calculates shared keys, and stores the message for later use.
      *
      * @param buffer_in A unique_ptr to the input buffer containing the M1 message.
      * @param buffer_in_len The length of the input buffer.
@@ -458,8 +472,8 @@ public:
      * @brief Updates the state in the MUCKLE key exchange protocol using the provided QKD key.
      *
      * This method performs a series of pseudorandom functions (PRFs) to update the state based on
-     * the provided quantum key distribution (QKD) key. It modifies internal state variables and increments
-     * the counter for the next iteration.
+     * the provided key from a quantum key distribution network (QKD). It modifies internal state 
+     * and secret keys and increments the counter for the next iteration.
      *
      * @param qkd_k A constant array of uint8_t representing the QKD key.
      * @return A return_code indicating the success or failure of the operation.

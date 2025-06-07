@@ -18,25 +18,6 @@
  * Private methods/functions implementation
  ****************************************************************************************************************/
 
-////////////////////////////////////////////ONLY FOR TEST FUNCTION////////////////////////////////////////////
-void printHex(const unsigned char *buffer, size_t size)
-{
-    for (size_t i = 0; i < size; ++i)
-    {
-        std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(buffer[i]);
-        if (i % 16 == 15)
-        {
-            std::cout << std::endl;
-        }
-        else
-        {
-            std::cout << ' ';
-        }
-    }
-    std::cout << std::dec << std::endl;
-}
-////////////////////////////////////////////ONLY FOR TEST FUNCTION////////////////////////////////////////////
-
 void key_exchange_MUCKLE::mac_sign(const uint8_t *msg, const size_t msg_len, const uint8_t *k, const size_t k_len, uint8_t *tag)
 {
     auto mac = Botan::MessageAuthenticationCode::create_or_throw(hmac_botan_primitive_names[mac_prim]); // create an instance of a mac

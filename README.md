@@ -55,7 +55,7 @@ The implementation uses Botan cryptographic library primitives for message authe
 
 ### Dependencies
 
-- [Botan](https://botan.randombit.net/) cryptographic library (version compatible with your code).
+- [Botan](https://botan.randombit.net/) cryptographic library .
 
 ### How to Compile
 

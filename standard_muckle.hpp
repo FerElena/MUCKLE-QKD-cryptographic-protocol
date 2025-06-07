@@ -8,8 +8,8 @@
  *
  * the QKD protocol is not implemented here, the keys transmitted by QKD are expected to be inserted externally into the class
  *
- * @author Fernando Elena Benavente , felena@oesia.com
- *
+ * @author Fernando Elena Benavente 
+ * 
  * @details the protocol is described in detail in the publication paper: https://eprint.iacr.org/2020/099.pdf
  *
  */

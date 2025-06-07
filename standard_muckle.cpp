@@ -2,7 +2,7 @@
  * @file standar_mucke.cpp
  * @brief File containing the implementation of the standard_Muckle protocol,
  *
- * @author Fernando Elena Benavente , felena@oesia.com
+ * @author Fernando Elena Benavente 
  *
  * @details the protocol is described in detail in the publication paper: https://eprint.iacr.org/2020/099.pdf
  *
